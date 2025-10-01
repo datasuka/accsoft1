@@ -6,7 +6,6 @@ from num2words import num2words
 
 # --- helper untuk hitung line ---
 def get_num_lines(pdf, text, col_width):
-    # hitung banyaknya line untuk wrap text
     result = pdf.multi_cell(col_width, 6, text, split_only=True)
     return len(result)
 
@@ -116,7 +115,7 @@ def buat_voucher(df, no_voucher, settings):
 
     # total row
     pdf.set_font("Arial","B",9)
-    pdf.cell(col_widths[0]+col_widths[1]+col_widths[2]+col_widths[3],8,"Total",border=1,align="R")
+    pdf.cell(sum(col_widths[:-2]),8,"Total",border=1,align="R")
     pdf.cell(col_widths[4],8,f"{total_debit:,}".replace(",", "."),border=1,align="R")
     pdf.cell(col_widths[5],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
@@ -142,24 +141,24 @@ def buat_voucher(df, no_voucher, settings):
 st.set_page_config(page_title="Mini Akunting", layout="wide")
 st.title("📑 Mini Akunting - Voucher Jurnal")
 
+# Sidebar
+st.sidebar.header("⚙️ Pengaturan Perusahaan")
+settings = {}
+settings["perusahaan"] = st.sidebar.text_input("Nama Perusahaan")
+settings["alamat"] = st.sidebar.text_area("Alamat Perusahaan")
+settings["direktur"] = st.sidebar.text_input("Nama Direktur")
+settings["finance"] = st.sidebar.text_input("Nama Finance")
+logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
+if logo_file:
+    tmp = BytesIO(logo_file.read())
+    settings["logo"] = tmp
+
+# Main content
 file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx","xls"])
 if file:
     df = pd.read_excel(file)
     df = bersihkan_jurnal(df)
     st.dataframe(df.head())
-
-    settings = {}
-    col1,col2 = st.columns(2)
-    with col1:
-        settings["perusahaan"] = st.text_input("Nama Perusahaan")
-        settings["alamat"] = st.text_area("Alamat Perusahaan")
-        settings["direktur"] = st.text_input("Nama Direktur")
-    with col2:
-        settings["finance"] = st.text_input("Nama Finance")
-        logo_file = st.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
-        if logo_file:
-            tmp = BytesIO(logo_file.read())
-            settings["logo"] = tmp
 
     no_voucher = st.selectbox("Pilih Nomor Voucher", df["Nomor Voucher Jurnal"].unique())
 
