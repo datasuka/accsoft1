@@ -42,9 +42,9 @@ def bersihkan_jurnal(df):
                 .str.replace(r"\.", "", regex=True)   # hapus titik ribuan
                 .str.replace(",", ".", regex=True)    # koma → titik
                 .replace("", "0")
-                .astype(float)
-                .astype(int)
             )
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
     return df
 
 # --- Fungsi Generate Voucher ---
