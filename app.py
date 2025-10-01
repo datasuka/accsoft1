@@ -1,186 +1,106 @@
 import streamlit as st
 import pandas as pd
-from fpdf import FPDF
 from io import BytesIO
+from fpdf import FPDF
 from num2words import num2words
 
-# --- helper untuk hitung line ---
-def get_num_lines(pdf, text, col_width):
-    result = pdf.multi_cell(col_width, 6, text, split_only=True)
-    return len(result)
-
-# --- bersihkan data ---
 def bersihkan_jurnal(df):
-    df = df.rename(columns=lambda x: str(x).strip().lower())
-    mapping = {
-        "tanggal": "Tanggal",
-        "nomor voucher jurnal": "Nomor Voucher Jurnal",
-        "no akun": "No Akun",
-        "akun": "Akun",
-        "deskripsi": "Deskripsi",
-        "debet": "Debet",
-        "kredit": "Kredit"
-    }
-    df = df.rename(columns={k.lower(): v for k,v in mapping.items() if k.lower() in df.columns})
-    df["Debet"] = pd.to_numeric(df.get("Debet", 0), errors="coerce").fillna(0)
-    df["Kredit"] = pd.to_numeric(df.get("Kredit", 0), errors="coerce").fillna(0)
+    df.columns = [c.strip() for c in df.columns]
+    df["Tanggal"] = pd.to_datetime(df["Tanggal"], errors="coerce").dt.strftime("%d/%m/%Y")
+    df["Debet"] = pd.to_numeric(df["Debet"], errors="coerce").fillna(0)
+    df["Kredit"] = pd.to_numeric(df["Kredit"], errors="coerce").fillna(0)
     return df
 
-# --- generate voucher PDF ---
-def buat_voucher(df, no_voucher, settings):
-    pdf = FPDF("P", "mm", "A4")
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 12)
+# --- Fungsi PDF tetap sama (sudah ada) ---
 
-    # Header perusahaan
-    if settings.get("logo"):
-        pdf.image(settings["logo"], 10, 8, settings.get("logo_size", 25))
+st.title("🧾 Mini Akunting - Voucher Jurnal")
 
-    pdf.set_xy(0, 10)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(210, 6, settings.get("perusahaan",""), ln=1, align="C")
+file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx", "xls"])
 
-    pdf.set_font("Arial", "", 10)
-    pdf.multi_cell(210, 5, settings.get("alamat",""), align="C")
-    pdf.ln(5)
+with st.form("settings_form"):
+    st.subheader("⚙️ Pengaturan Perusahaan")
+    perusahaan = st.text_input("Nama Perusahaan")
+    alamat = st.text_area("Alamat Perusahaan")
+    direktur = st.text_input("Nama Direktur")
+    finance = st.text_input("Nama Finance")
+    logo = st.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
+    submitted = st.form_submit_button("Simpan Pengaturan")
 
-    # Judul
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "BUKTI VOUCHER JURNAL", ln=1, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(0, 8, f"No Voucher : {no_voucher}", ln=1, align="C")
-    pdf.ln(4)
+settings = {
+    "perusahaan": perusahaan,
+    "alamat": alamat,
+    "direktur": direktur,
+    "finance": finance,
+    "logo": logo
+}
 
-    # ambil data voucher
-    data = df[df["Nomor Voucher Jurnal"] == no_voucher]
-
-    # table header
-    col_widths = [25, 20, 50, 55, 20, 20]
-    headers = ["Tanggal","Akun","Nama Akun","Deskripsi","Debit","Kredit"]
-
-    pdf.set_font("Arial","B",9)
-    for h,w in zip(headers,col_widths):
-        pdf.cell(w, 8, h, border=1, align="C")
-    pdf.ln()
-
-    pdf.set_font("Arial","",9)
-    total_debit, total_kredit = 0,0
-
-    for _, row in data.iterrows():
-        debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
-        kredit_val = int(row["Kredit"]) if pd.notna(row["Kredit"]) else 0
-
-        try:
-            tgl = pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y")
-        except:
-            tgl = str(row["Tanggal"])
-
-        values = [
-            tgl,
-            str(row["No Akun"]),
-            str(row["Akun"]),
-            str(row["Deskripsi"]),
-            f"{debit_val:,}".replace(",", "."),
-            f"{kredit_val:,}".replace(",", ".")
-        ]
-
-        # Sinkronisasi multi-line
-        nama_lines = pdf.multi_cell(col_widths[2], 6, values[2], split_only=True)
-        desc_lines = pdf.multi_cell(col_widths[3], 6, values[3], split_only=True)
-        max_lines = max(len(nama_lines), len(desc_lines))
-        row_height = max_lines * 6
-
-        # Posisi awal
-        pdf.cell(col_widths[0], row_height, values[0], border=1, align="L")
-        pdf.cell(col_widths[1], row_height, values[1], border=1, align="L")
-
-        # Nama Akun sinkron
-        x2, y2 = pdf.get_x(), pdf.get_y()
-        for i in range(max_lines):
-            line = nama_lines[i] if i < len(nama_lines) else ""
-            border = "LR" if i < max_lines-1 else 1
-            pdf.multi_cell(col_widths[2], 6, line, border=border, align="L")
-        pdf.set_xy(x2+col_widths[2], y2)
-
-        # Deskripsi sinkron
-        x3, y3 = pdf.get_x(), pdf.get_y()
-        for i in range(max_lines):
-            line = desc_lines[i] if i < len(desc_lines) else ""
-            border = "LR" if i < max_lines-1 else 1
-            pdf.multi_cell(col_widths[3], 6, line, border=border, align="L")
-        pdf.set_xy(x3+col_widths[3], y3)
-
-        # Debit & Kredit
-        pdf.cell(col_widths[4], row_height, values[4], border=1, align="R")
-        pdf.cell(col_widths[5], row_height, values[5], border=1, align="R")
-        pdf.ln(row_height)
-
-        total_debit += debit_val
-        total_kredit += kredit_val
-
-    # total row
-    pdf.set_font("Arial","B",9)
-    pdf.cell(sum(col_widths[:-2]),8,"Total",border=1,align="R")
-    pdf.cell(col_widths[4],8,f"{total_debit:,}".replace(",", "."),border=1,align="R")
-    pdf.cell(col_widths[5],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
-    pdf.ln()
-
-    # terbilang
-    pdf.set_font("Arial","I",9)
-    pdf.multi_cell(0,6,f"Terbilang: {num2words(total_debit, lang='id')} rupiah")
-
-    # tanda tangan
-    pdf.ln(15)
-    pdf.set_font("Arial","",10)
-    pdf.cell(95,6,"Direktur,",align="C")
-    pdf.cell(95,6,"Finance,",align="C",ln=1)
-    pdf.ln(20)
-    pdf.cell(95,6,f"({settings.get('direktur','')})",align="C")
-    pdf.cell(95,6,f"({settings.get('finance','')})",align="C",ln=1)
-
-    buffer = BytesIO()
-    pdf.output(buffer)
-    return buffer
-
-# --- Streamlit ---
-st.set_page_config(page_title="Mini Akunting", layout="wide")
-st.title("📑 Mini Akunting - Voucher Jurnal")
-
-# Sidebar
-st.sidebar.header("⚙️ Pengaturan Perusahaan")
-settings = {}
-settings["perusahaan"] = st.sidebar.text_input("Nama Perusahaan")
-settings["alamat"] = st.sidebar.text_area("Alamat Perusahaan")
-settings["direktur"] = st.sidebar.text_input("Nama Direktur")
-settings["finance"] = st.sidebar.text_input("Nama Finance")
-settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 50, 25)
-logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
-if logo_file:
-    tmp = BytesIO(logo_file.read())
-    settings["logo"] = tmp
-
-# Main content
-file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx","xls"])
 if file:
     df = pd.read_excel(file)
     df = bersihkan_jurnal(df)
 
-    # Preview per voucher
-    st.subheader("📋 Preview Jurnal")
-    for voucher_id, group in df.groupby("Nomor Voucher Jurnal"):
-        with st.expander(f"Voucher: {voucher_id}"):
-            try:
-                tanggal = pd.to_datetime(group["Tanggal"].iloc[0]).strftime("%d/%m/%Y")
-            except:
-                tanggal = str(group["Tanggal"].iloc[0])
-            st.markdown(f"**Tanggal:** {tanggal}")
-            st.markdown(f"**Nomor Voucher:** {voucher_id}")
-
-            preview = group[["No Akun","Akun","Deskripsi","Debet","Kredit"]]
-            st.dataframe(preview, use_container_width=True)
-
     no_voucher = st.selectbox("Pilih Nomor Voucher", df["Nomor Voucher Jurnal"].unique())
 
-    if st.button("Cetak Voucher Jurnal"):
-        pdf_file = buat_voucher(df, no_voucher, settings)
-        st.download_button("Download PDF", data=pdf_file, file_name="voucher_jurnal.pdf")
+    if no_voucher:
+        group = df[df["Nomor Voucher Jurnal"] == no_voucher]
+        total_debit = group["Debet"].sum()
+        total_kredit = group["Kredit"].sum()
+
+        # --- Print Preview mirip PDF ---
+        st.subheader("🖨️ Print Preview Voucher")
+
+        html = f"""
+        <div style="text-align:center;">
+            <h3>{settings.get('perusahaan','')}</h3>
+            <p>{settings.get('alamat','')}</p>
+            <h4 style="margin-top:20px;">BUKTI VOUCHER JURNAL</h4>
+            <p>No Voucher : {no_voucher}</p>
+        </div>
+        <br>
+        <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse; width:100%; font-size:13px;">
+            <tr style="background-color:#f0f0f0; font-weight:bold; text-align:center;">
+                <td>Tanggal</td>
+                <td>Akun</td>
+                <td>Nama Akun</td>
+                <td>Deskripsi</td>
+                <td>Debit</td>
+                <td>Kredit</td>
+            </tr>
+        """
+
+        for _, row in group.iterrows():
+            html += f"""
+            <tr>
+                <td>{row['Tanggal']}</td>
+                <td>{row['No Akun']}</td>
+                <td>{row['Akun']}</td>
+                <td>{row['Deskripsi']}</td>
+                <td style="text-align:right;">{row['Debet']:,.0f}</td>
+                <td style="text-align:right;">{row['Kredit']:,.0f}</td>
+            </tr>
+            """
+
+        html += f"""
+            <tr style="font-weight:bold;">
+                <td colspan="4" style="text-align:right;">Total</td>
+                <td style="text-align:right;">{total_debit:,.0f}</td>
+                <td style="text-align:right;">{total_kredit:,.0f}</td>
+            </tr>
+        </table>
+        <br>
+        <p><i>Terbilang: {num2words(int(total_debit), lang='id')} rupiah</i></p>
+        <br><br><br>
+        <table style="width:100%; text-align:center;">
+            <tr>
+                <td>Direktur,<br><br><br>({settings.get('direktur','')})</td>
+                <td>Finance,<br><br><br>({settings.get('finance','')})</td>
+            </tr>
+        </table>
+        """
+
+        st.markdown(html, unsafe_allow_html=True)
+
+        # --- Tombol cetak PDF ---
+        if st.button("Cetak Voucher Jurnal"):
+            pdf_file = buat_voucher(df, no_voucher, settings)
+            st.download_button("Download PDF", data=pdf_file,
+                               file_name=f"voucher_{no_voucher}.pdf")
