@@ -52,29 +52,32 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(40, 8, "Kredit", 1, align="R")
     pdf.ln()
 
-    total = 0
+    total_debit = 0
+    total_kredit = 0
+
     pdf.set_font("Arial", '', 10)
     for _, row in data.iterrows():
-        debit_val = row.get("debit", 0) if pd.notna(row.get("debit", 0)) else 0
-        kredit_val = row.get("kredit", 0) if pd.notna(row.get("kredit", 0)) else 0
+        debit_val = int(row.get("debit", 0)) if pd.notna(row.get("debit", 0)) else 0
+        kredit_val = int(row.get("kredit", 0)) if pd.notna(row.get("kredit", 0)) else 0
 
         pdf.cell(40, 8, str(row.get('no akun', '')), 1)
         pdf.cell(70, 8, str(row.get('deskripsi', '')), 1)
-        pdf.cell(40, 8, f"{int(debit_val):,}", 1, align="R")
-        pdf.cell(40, 8, f"{int(kredit_val):,}", 1, align="R")
+        pdf.cell(40, 8, f"{debit_val:,}", 1, align="R")
+        pdf.cell(40, 8, f"{kredit_val:,}", 1, align="R")
         pdf.ln()
 
-        total += debit_val
+        total_debit += debit_val
+        total_kredit += kredit_val
 
     # Total
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(110, 8, "Total", 1)
-    pdf.cell(40, 8, f"{int(total):,}", 1, align="R")
-    pdf.cell(40, 8, "", 1)
+    pdf.cell(40, 8, f"{total_debit:,}", 1, align="R")
+    pdf.cell(40, 8, f"{total_kredit:,}", 1, align="R")
     pdf.ln()
 
     pdf.set_font("Arial", 'I', 9)
-    pdf.multi_cell(0, 6, f"Terbilang: {terbilang(int(total))} rupiah")
+    pdf.multi_cell(0, 6, f"Terbilang: {terbilang(int(total_debit))} rupiah")
 
     pdf.ln(15)
     pdf.set_font("Arial", '', 10)
@@ -120,6 +123,17 @@ if uploaded_file:
 
     # Normalisasi kolom
     df.columns = df.columns.str.strip().str.lower()
+
+    # Bersihkan angka di kolom debit/kredit
+    for col in ["debit", "kredit"]:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)  # pastikan string
+                .str.replace(r"[^\d\-]", "", regex=True)  # hapus semua non-digit kecuali minus
+                .replace("", "0")
+                .astype(int)
+            )
 
     # Preview
     st.subheader("Preview Data Jurnal")
