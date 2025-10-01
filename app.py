@@ -18,6 +18,8 @@ def bersihkan_jurnal(df):
 # Fungsi cetak PDF voucher
 # =========================
 def buat_voucher(df, no_voucher, settings):
+    group = df[df["Nomor Voucher Jurnal"] == no_voucher]
+
     pdf = FPDF("P", "mm", "A4")
     pdf.add_page()
     pdf.set_font("Arial", "B", 12)
@@ -27,23 +29,24 @@ def buat_voucher(df, no_voucher, settings):
         pdf.image(settings["logo"], 10, 8, 25)
 
     # Nama perusahaan & alamat
+    pdf.set_font("Arial", "B", 12)
     pdf.cell(200, 10, settings.get("perusahaan",""), ln=1, align="C")
     pdf.set_font("Arial", "", 10)
     pdf.multi_cell(200, 5, settings.get("alamat",""), align="C")
-    pdf.ln(5)
-
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(200, 10, "BUKTI VOUCHER JURNAL", ln=1, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(200, 7, f"No Voucher : {no_voucher}", ln=1, align="C")
     pdf.ln(3)
 
-    group = df[df["Nomor Voucher Jurnal"] == no_voucher]
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 8, "BUKTI VOUCHER JURNAL", ln=1, align="C")
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(200, 7, f"No Voucher : {no_voucher}", ln=1, align="C")
+    pdf.ln(4)
+
+    # Lebar kolom sinkron dengan preview
+    col_widths = [25, 20, 55, 50, 20, 20]
+    headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debet", "Kredit"]
 
     # Header tabel
     pdf.set_font("Arial", "B", 9)
-    col_widths = [25, 20, 55, 50, 20, 20]
-    headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debet", "Kredit"]
     for i, h in enumerate(headers):
         pdf.cell(col_widths[i], 8, h, 1, 0, "C")
     pdf.ln()
@@ -53,8 +56,12 @@ def buat_voucher(df, no_voucher, settings):
     for _, row in group.iterrows():
         pdf.cell(col_widths[0], 8, str(row["Tanggal"]), 1)
         pdf.cell(col_widths[1], 8, str(row["No Akun"]), 1)
-        pdf.cell(col_widths[2], 8, str(row["Akun"])[:30], 1)  # wrap manual
-        pdf.cell(col_widths[3], 8, str(row["Deskripsi"])[:30], 1)
+        pdf.multi_cell(col_widths[2], 8, str(row["Akun"]), border=1)
+        x = pdf.get_x()
+        y = pdf.get_y() - 8
+        pdf.set_xy(x + col_widths[2], y)
+        pdf.multi_cell(col_widths[3], 8, str(row["Deskripsi"]), border=1)
+        pdf.set_xy(x + col_widths[2] + col_widths[3], y)
         pdf.cell(col_widths[4], 8, f"{row['Debet']:,.0f}", 1, 0, "R")
         pdf.cell(col_widths[5], 8, f"{row['Kredit']:,.0f}", 1, 0, "R")
         pdf.ln()
@@ -70,7 +77,7 @@ def buat_voucher(df, no_voucher, settings):
 
     # Terbilang
     pdf.set_font("Arial", "I", 9)
-    pdf.cell(200, 5, f"Terbilang: {num2words(int(total_debit), lang='id')} rupiah", ln=1)
+    pdf.multi_cell(200, 5, f"Terbilang: {num2words(int(total_debit), lang='id')} rupiah")
 
     # Tanda tangan
     pdf.ln(20)
@@ -92,7 +99,7 @@ st.title("🧾 Mini Akunting - Voucher Jurnal")
 
 file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx", "xls"])
 
-# Pengaturan perusahaan (langsung di main form)
+# Form pengaturan perusahaan
 with st.form("settings_form"):
     st.subheader("⚙️ Pengaturan Perusahaan")
     perusahaan = st.text_input("Nama Perusahaan")
@@ -124,6 +131,31 @@ if file:
         # =========================
         st.subheader("🖨️ Print Preview Voucher")
 
+        st.markdown("""
+        <style>
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 13px;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 6px;
+                vertical-align: top;
+                text-align: left;
+                word-wrap: break-word;
+                white-space: pre-wrap;
+            }
+            th {
+                background-color: #f2f2f2;
+                text-align: center;
+            }
+            td:nth-child(5), td:nth-child(6) {
+                text-align: right;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
         html = f"""
         <div style="text-align:center;">
             <h3>{settings.get('perusahaan','')}</h3>
@@ -131,16 +163,21 @@ if file:
             <h4>BUKTI VOUCHER JURNAL</h4>
             <p>No Voucher : {no_voucher}</p>
         </div>
-        <table style="width:100%; border-collapse: collapse;" border="1">
-            <tr>
-                <th>Tanggal</th>
-                <th>Akun</th>
-                <th>Nama Akun</th>
-                <th>Deskripsi</th>
-                <th>Debet</th>
-                <th>Kredit</th>
-            </tr>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:12%;">Tanggal</th>
+                    <th style="width:10%;">Akun</th>
+                    <th style="width:25%;">Nama Akun</th>
+                    <th style="width:28%;">Deskripsi</th>
+                    <th style="width:12%;">Debet</th>
+                    <th style="width:13%;">Kredit</th>
+                </tr>
+            </thead>
+            <tbody>
         """
+
         for _, row in group.iterrows():
             html += f"""
             <tr>
@@ -148,19 +185,23 @@ if file:
                 <td>{row['No Akun']}</td>
                 <td>{row['Akun']}</td>
                 <td>{row['Deskripsi']}</td>
-                <td style="text-align:right;">{row['Debet']:,.0f}</td>
-                <td style="text-align:right;">{row['Kredit']:,.0f}</td>
+                <td>{row['Debet']:,.0f}</td>
+                <td>{row['Kredit']:,.0f}</td>
             </tr>
             """
+
         total_debit = group["Debet"].sum()
         total_kredit = group["Kredit"].sum()
+
         html += f"""
             <tr>
                 <td colspan="4" style="text-align:right;"><b>Total</b></td>
-                <td style="text-align:right;"><b>{total_debit:,.0f}</b></td>
-                <td style="text-align:right;"><b>{total_kredit:,.0f}</b></td>
+                <td><b>{total_debit:,.0f}</b></td>
+                <td><b>{total_kredit:,.0f}</b></td>
             </tr>
+            </tbody>
         </table>
+
         <p><i>Terbilang: {num2words(int(total_debit), lang='id')} rupiah</i></p>
         <br><br>
         <table style="width:100%; text-align:center; border:0;">
@@ -175,6 +216,7 @@ if file:
             </tr>
         </table>
         """
+
         st.markdown(html, unsafe_allow_html=True)
 
         # =========================
