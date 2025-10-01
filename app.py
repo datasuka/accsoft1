@@ -30,16 +30,19 @@ def bersihkan_jurnal(df):
 
     # Hapus baris kosong / header duplikat
     df = df.dropna(how="all")
-    df = df[df["akun"] != "akun"] if "akun" in df.columns else df
+    if "akun" in df.columns:
+        df = df[df["akun"].str.lower() != "akun"]
 
-    # Bersihkan angka debit/kredit
+    # Bersihkan angka debit/kredit (format Indonesia)
     for col in ["debit", "kredit"]:
         if col in df.columns:
             df[col] = (
                 df[col]
                 .astype(str)
-                .str.replace(r"[^\d\-]", "", regex=True)
+                .str.replace(r"\.", "", regex=True)   # hapus titik ribuan
+                .str.replace(",", ".", regex=True)    # koma → titik
                 .replace("", "0")
+                .astype(float)
                 .astype(int)
             )
     return df
@@ -77,10 +80,11 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     # Tabel Jurnal
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(40, 8, "Akun", 1)
-    pdf.cell(70, 8, "Deskripsi", 1)
-    pdf.cell(40, 8, "Debit", 1, align="R")
-    pdf.cell(40, 8, "Kredit", 1, align="R")
+    pdf.cell(30, 8, "Tanggal", 1)
+    pdf.cell(30, 8, "Akun", 1)
+    pdf.cell(60, 8, "Nama Akun", 1)
+    pdf.cell(30, 8, "Debit", 1, align="R")
+    pdf.cell(30, 8, "Kredit", 1, align="R")
     pdf.ln()
 
     total_debit = 0
@@ -91,10 +95,11 @@ def buat_voucher(jurnal_df, no_voucher, settings):
         debit_val = int(row.get("debit", 0)) if pd.notna(row.get("debit", 0)) else 0
         kredit_val = int(row.get("kredit", 0)) if pd.notna(row.get("kredit", 0)) else 0
 
-        pdf.cell(40, 8, str(row.get('no akun', '')), 1)
-        pdf.cell(70, 8, str(row.get('deskripsi', '')), 1)
-        pdf.cell(40, 8, f"{debit_val:,}", 1, align="R")
-        pdf.cell(40, 8, f"{kredit_val:,}", 1, align="R")
+        pdf.cell(30, 8, str(row.get('tanggal', '')), 1)
+        pdf.cell(30, 8, str(row.get('no akun', '')), 1)
+        pdf.cell(60, 8, str(row.get('akun', '')), 1)
+        pdf.cell(30, 8, f"{debit_val:,}", 1, align="R")
+        pdf.cell(30, 8, f"{kredit_val:,}", 1, align="R")
         pdf.ln()
 
         total_debit += debit_val
@@ -102,9 +107,9 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     # Total
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(110, 8, "Total", 1)
-    pdf.cell(40, 8, f"{total_debit:,}", 1, align="R")
-    pdf.cell(40, 8, f"{total_kredit:,}", 1, align="R")
+    pdf.cell(120, 8, "Total", 1)
+    pdf.cell(30, 8, f"{total_debit:,}", 1, align="R")
+    pdf.cell(30, 8, f"{total_kredit:,}", 1, align="R")
     pdf.ln()
 
     # Tentukan nilai terbilang
