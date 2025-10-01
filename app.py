@@ -34,15 +34,17 @@ def buat_voucher(df, no_voucher, settings):
 
     # Header perusahaan
     if settings.get("logo"):
-        pdf.image(settings["logo"], 10, 8, 25)
-        pdf.set_xy(40, 10)
-    else:
-        pdf.set_xy(10, 10)
-    pdf.multi_cell(190, 6, settings.get("perusahaan",""), align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.multi_cell(190, 5, settings.get("alamat",""), align="C")
+        pdf.image(settings["logo"], 10, 8, settings.get("logo_size", 25))
 
+    pdf.set_xy(0, 10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.multi_cell(210, 6, settings.get("perusahaan",""), align="C")
+
+    pdf.set_font("Arial", "", 10)
+    pdf.multi_cell(210, 5, settings.get("alamat",""), align="C")
     pdf.ln(5)
+
+    # Judul
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 10, "BUKTI VOUCHER JURNAL", ln=1, align="C")
     pdf.set_font("Arial", "", 10)
@@ -76,7 +78,7 @@ def buat_voucher(df, no_voucher, settings):
         values = [
             tgl,
             str(row["No Akun"]),
-            str(row["Akun"]),   # Nama Akun panjang → wrap
+            str(row["Akun"]),   # Nama Akun wrap
             str(row["Deskripsi"]),
             f"{debit_val:,}".replace(",", "."),
             f"{kredit_val:,}".replace(",", ".")
@@ -86,10 +88,6 @@ def buat_voucher(df, no_voucher, settings):
         n_lines_nama = get_num_lines(pdf, values[2], col_widths[2])
         n_lines_desc = get_num_lines(pdf, values[3], col_widths[3])
         row_height = max(n_lines_nama, n_lines_desc) * 6
-
-        # simpan posisi awal
-        x = pdf.get_x()
-        y = pdf.get_y()
 
         # Tanggal & Akun
         pdf.cell(col_widths[0], row_height, values[0], border=1, align="L")
@@ -148,6 +146,7 @@ settings["perusahaan"] = st.sidebar.text_input("Nama Perusahaan")
 settings["alamat"] = st.sidebar.text_area("Alamat Perusahaan")
 settings["direktur"] = st.sidebar.text_input("Nama Direktur")
 settings["finance"] = st.sidebar.text_input("Nama Finance")
+settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 50, 25)
 logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
 if logo_file:
     tmp = BytesIO(logo_file.read())
