@@ -29,7 +29,6 @@ def buat_voucher(df, no_voucher, settings):
         pdf.image(settings["logo"], 10, 8, 25)
 
     # Nama perusahaan & alamat
-    pdf.set_font("Arial", "B", 12)
     pdf.cell(200, 10, settings.get("perusahaan",""), ln=1, align="C")
     pdf.set_font("Arial", "", 10)
     pdf.multi_cell(200, 5, settings.get("alamat",""), align="C")
@@ -41,27 +40,21 @@ def buat_voucher(df, no_voucher, settings):
     pdf.cell(200, 7, f"No Voucher : {no_voucher}", ln=1, align="C")
     pdf.ln(4)
 
-    # Lebar kolom sinkron dengan preview
+    # Lebar kolom sinkron preview
     col_widths = [25, 20, 55, 50, 20, 20]
     headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debet", "Kredit"]
 
-    # Header tabel
     pdf.set_font("Arial", "B", 9)
     for i, h in enumerate(headers):
         pdf.cell(col_widths[i], 8, h, 1, 0, "C")
     pdf.ln()
 
-    # Isi tabel
     pdf.set_font("Arial", "", 9)
     for _, row in group.iterrows():
         pdf.cell(col_widths[0], 8, str(row["Tanggal"]), 1)
         pdf.cell(col_widths[1], 8, str(row["No Akun"]), 1)
-        pdf.multi_cell(col_widths[2], 8, str(row["Akun"]), border=1)
-        x = pdf.get_x()
-        y = pdf.get_y() - 8
-        pdf.set_xy(x + col_widths[2], y)
-        pdf.multi_cell(col_widths[3], 8, str(row["Deskripsi"]), border=1)
-        pdf.set_xy(x + col_widths[2] + col_widths[3], y)
+        pdf.cell(col_widths[2], 8, str(row["Akun"])[:30], 1)
+        pdf.cell(col_widths[3], 8, str(row["Deskripsi"])[:30], 1)
         pdf.cell(col_widths[4], 8, f"{row['Debet']:,.0f}", 1, 0, "R")
         pdf.cell(col_widths[5], 8, f"{row['Kredit']:,.0f}", 1, 0, "R")
         pdf.ln()
@@ -156,6 +149,7 @@ if file:
         </style>
         """, unsafe_allow_html=True)
 
+        # Generate HTML preview
         html = f"""
         <div style="text-align:center;">
             <h3>{settings.get('perusahaan','')}</h3>
@@ -217,6 +211,7 @@ if file:
         </table>
         """
 
+        # ✅ render HTML beneran, bukan teks mentah
         st.markdown(html, unsafe_allow_html=True)
 
         # =========================
