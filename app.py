@@ -29,9 +29,8 @@ def buat_voucher(df, no_voucher, settings):
     pdf.set_left_margin(15)
     pdf.set_right_margin(15)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 12)
 
-    # Header perusahaan + logo
+    # Header perusahaan
     if settings.get("logo"):
         pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))
 
@@ -54,7 +53,7 @@ def buat_voucher(df, no_voucher, settings):
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
     # table header
-    col_widths = [28, 20, 75, 25, 25]  # Deskripsi dihapus, cukup 5 kolom
+    col_widths = [28, 20, 70, 30, 30]  # tanpa kolom deskripsi
     headers = ["Tanggal","Akun","Nama Akun","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
@@ -82,10 +81,10 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # hitung tinggi baris (wrap untuk nama akun saja)
+        # hitung tinggi baris
         line_counts = []
         for i, (val, w) in enumerate(zip(values, col_widths)):
-            if i in [3, 4]:  # Debit, Kredit -> single line
+            if i in [3,4]:  # Debit, Kredit
                 line_counts.append(1)
             else:
                 lines = pdf.multi_cell(w, 6, val, split_only=True)
@@ -97,10 +96,9 @@ def buat_voucher(df, no_voucher, settings):
         x_start = pdf.get_x()
         y_start = pdf.get_y()
         for i, (val, w) in enumerate(zip(values, col_widths)):
-            pdf.rect(x_start, y_start, w, row_height)   # kotak
+            pdf.rect(x_start, y_start, w, row_height)
             pdf.set_xy(x_start, y_start)
-
-            if i in [3,4]:  # angka -> cell biasa
+            if i in [3,4]:
                 pdf.cell(w, row_height, val, align="R")
             else:
                 pdf.multi_cell(w, 6, val, align="L")
@@ -120,18 +118,20 @@ def buat_voucher(df, no_voucher, settings):
     # ambil deskripsi pertama
     first_desc = str(data.iloc[0]["Deskripsi"]) if not data.empty else ""
 
-    # gabung kotak untuk terbilang + deskripsi
-    pdf.set_font("Arial","I",9)
     page_width = sum(col_widths)
-    terbilang_text = f"Terbilang : {num2words(total_debit, lang='id')} rupiah"
-    desc_text = f"Deskripsi : {first_desc}" if first_desc.strip() else ""
 
-    isi = terbilang_text + "\n" + desc_text
-    pdf.multi_cell(page_width, 6, isi, border=1, align="L")
-    pdf.ln(5)
+    # baris terbilang
+    pdf.set_font("Arial","I",9)
+    pdf.cell(page_width, 8, f"Terbilang : {num2words(total_debit, lang='id')} rupiah", border=1, ln=1, align="L")
+
+    # baris deskripsi
+    pdf.set_font("Arial","",9)
+    desc_text = f"Deskripsi : {first_desc}" if first_desc.strip() else "Deskripsi : -"
+    pdf.cell(page_width, 8, desc_text, border=1, ln=1, align="L")
+
+    pdf.ln(10)
 
     # tanda tangan
-    pdf.ln(10)
     pdf.set_font("Arial","",10)
     pdf.cell(90,6,"Direktur,",align="C")
     pdf.cell(90,6,"Finance,",align="C",ln=1)
