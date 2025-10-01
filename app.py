@@ -4,14 +4,14 @@ from fpdf import FPDF
 from num2words import num2words
 from PIL import Image
 
-# Fungsi terbilang
+# --- Fungsi Terbilang Indonesia ---
 def terbilang(nominal):
     try:
         return num2words(nominal, lang='id').replace("koma nol", "")
     except:
         return str(nominal)
 
-# Generate Voucher
+# --- Fungsi Generate Voucher ---
 def buat_voucher(jurnal_df, no_jurnal, settings):
     data = jurnal_df[jurnal_df['No Jurnal'] == no_jurnal]
 
@@ -139,7 +139,7 @@ if uploaded_file:
     st.subheader("Preview Data Jurnal")
     st.dataframe(df.head())
 
-    # Tombol Eksekusi
+    # Tabs eksekusi
     tab1, tab2, tab3 = st.tabs(["📄 Voucher Jurnal", "📊 Laba Rugi", "📊 Neraca"])
 
     with tab1:
@@ -152,12 +152,18 @@ if uploaded_file:
 
     with tab2:
         st.subheader("Laporan Laba Rugi")
-        laba_rugi = df[df['Akun'].astype(str).str.startswith(("4","5"))] \ 
-                      .groupby("Akun")[["Debit","Kredit"]].sum()
+        laba_rugi = (
+            df[df['Akun'].astype(str).str.startswith(("4", "5"))]
+            .groupby("Akun")[["Debit", "Kredit"]]
+            .sum()
+        )
         st.dataframe(laba_rugi)
 
     with tab3:
         st.subheader("Laporan Neraca")
-        neraca = df[df['Akun'].astype(str).str.startswith(("1","2","3"))] \ 
-                    .groupby("Akun")[["Debit","Kredit"]].sum()
+        neraca = (
+            df[df['Akun'].astype(str).str.startswith(("1", "2", "3"))]
+            .groupby("Akun")[["Debit", "Kredit"]]
+            .sum()
+        )
         st.dataframe(neraca)
