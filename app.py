@@ -31,9 +31,7 @@ def buat_voucher(df, no_voucher, settings):
     pdf.add_page()
     pdf.set_font("Arial", "B", 12)
 
-    page_width = 210 - 30  # total width minus margin kiri-kanan
-
-    # Header perusahaan + logo
+    # Header perusahaan
     if settings.get("logo"):
         pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))
 
@@ -56,19 +54,21 @@ def buat_voucher(df, no_voucher, settings):
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
     # table header
-    col_widths = [28, 20, 80, 30, 30]
-    headers = ["Tanggal","Akun","Nama Akun","Debit","Kredit"]
+    col_widths = [28, 20, 70, 35, 25, 25]  # deskripsi dibuang dari tabel utama
+    headers = ["Tanggal","Akun","Nama Akun","-","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
-    for h,w in zip(headers,col_widths):
-        pdf.cell(w, 8, h, border=1, align="C")
+    for i,h in enumerate(headers):
+        if i == 3:  # kolom dummy deskripsi
+            continue
+        pdf.cell(col_widths[i], 8, h if h != "-" else "", border=1, align="C")
     pdf.ln()
 
     total_debit, total_kredit = 0,0
     pdf.set_font("Arial","",9)
 
     first_desc = ""
-    for i, row in data.iterrows():
+    for idx, row in data.iterrows():
         debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
         kredit_val = int(row["Kredit"]) if pd.notna(row["Kredit"]) else 0
 
@@ -77,37 +77,28 @@ def buat_voucher(df, no_voucher, settings):
         except:
             tgl = str(row["Tanggal"])
 
-        if i == data.index[0]:
+        if first_desc == "" and str(row["Deskripsi"]).strip():
             first_desc = str(row["Deskripsi"])
 
         values = [
             tgl,
             str(row["No Akun"]),
             str(row["Akun"]),
+            "",  # dummy col
             f"{debit_val:,}".replace(",", "."),
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # hitung tinggi baris
-        line_counts = []
-        for idx, (val, w) in enumerate(zip(values, col_widths)):
-            if idx in [3,4]:  # angka
-                line_counts.append(1)
-            else:
-                lines = pdf.multi_cell(w, 6, val, split_only=True)
-                line_counts.append(len(lines))
-        row_height = max(line_counts) * 6
-
-        # gambar isi
+        row_height = 6
         x_start = pdf.get_x()
         y_start = pdf.get_y()
-        for idx, (val, w) in enumerate(zip(values, col_widths)):
+        for i, (val, w) in enumerate(zip(values, col_widths)):
+            if i == 3:  # skip deskripsi col
+                continue
             pdf.rect(x_start, y_start, w, row_height)
             pdf.set_xy(x_start, y_start)
-            if idx in [3,4]:
-                pdf.cell(w, row_height, val, align="R")
-            else:
-                pdf.multi_cell(w, 6, val, align="L")
+            align = "R" if i in [4,5] else "L"
+            pdf.multi_cell(w, 6, val, align=align)
             x_start += w
         pdf.set_y(y_start + row_height)
 
@@ -121,20 +112,18 @@ def buat_voucher(df, no_voucher, settings):
     pdf.cell(col_widths[-1],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
 
-    # terbilang (baris penuh)
+    # --- Tambahan baris Terbilang (dalam tabel) ---
     pdf.set_font("Arial","I",9)
-    pdf.set_x(15)
     terbilang_text = f"Terbilang : {num2words(total_debit, lang='id')} rupiah"
-    pdf.multi_cell(page_width, 6, terbilang_text, border=1, align="L")
+    pdf.multi_cell(sum(col_widths), 6, terbilang_text, border=1, align="L")
 
-    # deskripsi (baris penuh)
+    # --- Tambahan baris Deskripsi (dalam tabel, wrap) ---
     pdf.set_font("Arial","",9)
-    pdf.set_x(15)
     desc_text = f"Deskripsi : {first_desc}" if first_desc.strip() else "Deskripsi : -"
-    pdf.multi_cell(page_width, 6, desc_text, border=1, align="L")
+    pdf.multi_cell(sum(col_widths), 6, desc_text, border=1, align="L")
 
     # tanda tangan
-    pdf.ln(10)
+    pdf.ln(15)
     pdf.set_font("Arial","",10)
     pdf.cell(90,6,"Direktur,",align="C")
     pdf.cell(90,6,"Finance,",align="C",ln=1)
