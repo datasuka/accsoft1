@@ -119,9 +119,11 @@ def buat_voucher(df, no_voucher, settings):
     pdf.cell(col_widths[4],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
 
-    # Terbilang row
+    # Terbilang row (Title Case + titik)
     pdf.set_font("Arial","I",9)
-    pdf.cell(sum(col_widths),8,f"Terbilang : {num2words(total_debit, lang='id')} rupiah",border=1,align="L")
+    terbilang_text = num2words(total_debit, lang='id') + " rupiah"
+    terbilang_text = terbilang_text.title() + "."
+    pdf.cell(sum(col_widths),8,f"Terbilang : {terbilang_text}",border=1,align="L")
     pdf.ln()
 
     # Deskripsi row
