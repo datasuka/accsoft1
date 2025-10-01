@@ -5,7 +5,6 @@ from io import BytesIO
 from num2words import num2words
 import zipfile
 import calendar
-from datetime import datetime
 
 # --- bersihkan data ---
 def bersihkan_jurnal(df):
@@ -29,16 +28,13 @@ def buat_voucher(df, no_voucher, settings):
     pdf = FPDF("P", "mm", "A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 12)
 
-    # Header perusahaan
+    # Header perusahaan + logo
     if settings.get("logo"):
         pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))
 
-    pdf.set_xy(0, 10)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(210, 6, settings.get("perusahaan",""), ln=1, align="C")
-
     pdf.set_font("Arial", "", 10)
     pdf.multi_cell(210, 5, settings.get("alamat",""), align="C")
     pdf.ln(5)
@@ -53,12 +49,11 @@ def buat_voucher(df, no_voucher, settings):
     # ambil data voucher
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
-    # table header (total 180 mm lebar)
-    col_widths = [23, 18, 50, 50, 20, 19]
+    # table header
+    col_widths = [25, 20, 55, 55, 25, 25]
     headers = ["Tanggal","Akun","Nama Akun","Deskripsi","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
-    x_start = pdf.l_margin
     for h,w in zip(headers,col_widths):
         pdf.cell(w, 8, h, border=1, align="C")
     pdf.ln()
@@ -69,7 +64,6 @@ def buat_voucher(df, no_voucher, settings):
     for _, row in data.iterrows():
         debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
         kredit_val = int(row["Kredit"]) if pd.notna(row["Kredit"]) else 0
-
         try:
             tgl = pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y")
         except:
@@ -84,24 +78,51 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # hitung tinggi baris (line count max)
-        line_counts = []
-        for val, w in zip(values, col_widths):
-            lines = pdf.multi_cell(w, 6, val, split_only=True)
-            line_counts.append(len(lines))
-        max_lines = max(line_counts)
+        # hitung tinggi baris hanya untuk kolom teks
+        nama_lines = pdf.multi_cell(col_widths[2], 6, values[2], split_only=True)
+        desc_lines = pdf.multi_cell(col_widths[3], 6, values[3], split_only=True)
+        max_lines = max(len(nama_lines), len(desc_lines), 1)
         row_height = max_lines * 6
 
-        # gambar kotak tiap kolom
-        x_start = pdf.l_margin
-        y_start = pdf.get_y()
-        for i, (val, w) in enumerate(zip(values, col_widths)):
-            pdf.rect(x_start, y_start, w, row_height)
-            pdf.set_xy(x_start, y_start)
-            align = "R" if i in [4,5] else "L"
-            pdf.multi_cell(w, 6, val, align=align)
-            x_start += w
-        pdf.set_y(y_start + row_height)
+        # gambar baris
+        x = pdf.l_margin
+        y = pdf.get_y()
+
+        # Tanggal
+        pdf.rect(x, y, col_widths[0], row_height)
+        pdf.multi_cell(col_widths[0], 6, values[0], border=0)
+        x += col_widths[0]
+        pdf.set_xy(x, y)
+
+        # Akun
+        pdf.rect(x, y, col_widths[1], row_height)
+        pdf.multi_cell(col_widths[1], 6, values[1], border=0)
+        x += col_widths[1]
+        pdf.set_xy(x, y)
+
+        # Nama Akun
+        pdf.rect(x, y, col_widths[2], row_height)
+        pdf.multi_cell(col_widths[2], 6, values[2], border=0)
+        x += col_widths[2]
+        pdf.set_xy(x, y)
+
+        # Deskripsi
+        pdf.rect(x, y, col_widths[3], row_height)
+        pdf.multi_cell(col_widths[3], 6, values[3], border=0)
+        x += col_widths[3]
+        pdf.set_xy(x, y)
+
+        # Debit (angka single line)
+        pdf.rect(x, y, col_widths[4], row_height)
+        pdf.cell(col_widths[4], row_height, values[4], border=0, align="R")
+        x += col_widths[4]
+        pdf.set_xy(x, y)
+
+        # Kredit (angka single line)
+        pdf.rect(x, y, col_widths[5], row_height)
+        pdf.cell(col_widths[5], row_height, values[5], border=0, align="R")
+
+        pdf.set_y(y + row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
@@ -141,7 +162,7 @@ settings["perusahaan"] = st.sidebar.text_input("Nama Perusahaan")
 settings["alamat"] = st.sidebar.text_area("Alamat Perusahaan")
 settings["direktur"] = st.sidebar.text_input("Nama Direktur")
 settings["finance"] = st.sidebar.text_input("Nama Finance")
-settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 40, 20)
+settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 50, 25)
 logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
 if logo_file:
     tmp = BytesIO(logo_file.read())
