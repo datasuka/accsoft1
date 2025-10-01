@@ -20,6 +20,7 @@ def bersihkan_jurnal(df):
     df = df.rename(columns={k.lower(): v for k, v in mapping.items() if k.lower() in df.columns})
     df["Debet"] = pd.to_numeric(df.get("Debet", 0), errors="coerce").fillna(0)
     df["Kredit"] = pd.to_numeric(df.get("Kredit", 0), errors="coerce").fillna(0)
+    df["Tanggal"] = pd.to_datetime(df["Tanggal"], errors="coerce")
     return df
 
 # --- Buat voucher ---
@@ -161,11 +162,21 @@ if file:
             st.download_button("Download PDF", data=pdf_file, file_name=f"voucher_{no_voucher}.pdf", mime="application/pdf")
 
     else:  # Multi Voucher
-        if st.button("⬇️ Download Semua Voucher"):
+        df["bulan"] = df["Tanggal"].dt.strftime("%B %Y")  # contoh: Januari 2024
+        bulan_opsi = ["Semua Bulan"] + sorted(df["bulan"].dropna().unique().tolist())
+        pilih_bulan = st.selectbox("Pilih Bulan Voucher", bulan_opsi)
+
+        if pilih_bulan != "Semua Bulan":
+            df_filtered = df[df["bulan"] == pilih_bulan]
+        else:
+            df_filtered = df
+
+        if st.button("⬇️ Download Semua Voucher (ZIP)"):
             buffer = BytesIO()
             with zipfile.ZipFile(buffer, "w") as zipf:
-                for no_voucher in df["Nomor Voucher Jurnal"].unique():
+                for no_voucher in df_filtered["Nomor Voucher Jurnal"].unique():
                     pdf_bytes = buat_voucher(df, no_voucher, settings)
                     zipf.writestr(f"voucher_{no_voucher}.pdf", pdf_bytes)
             buffer.seek(0)
-            st.download_button("Download ZIP", data=buffer, file_name="all_vouchers.zip", mime="application/zip")
+            nama_file = "all_vouchers.zip" if pilih_bulan == "Semua Bulan" else f"vouchers_{pilih_bulan.replace(' ','_')}.zip"
+            st.download_button("Download ZIP", data=buffer, file_name=nama_file, mime="application/zip")
