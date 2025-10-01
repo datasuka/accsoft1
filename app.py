@@ -89,7 +89,7 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     # Tabel Header
     pdf.set_font("Arial", 'B', 10)
-    col_widths = [25, 25, 50, 40, 25, 25]
+    col_widths = [25, 25, 50, 60, 25, 25]  # Deskripsi diperlebar jadi 60
     headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debit", "Kredit"]
     for i, h in enumerate(headers):
         pdf.cell(col_widths[i], 8, h, 1, align="C")
@@ -120,12 +120,12 @@ def buat_voucher(jurnal_df, no_voucher, settings):
             line_counts.append(n_lines)
         row_height = max(line_counts) * 6
 
-        # --- Cetak setiap kolom ---
+        # --- Render baris dengan row lock ---
         x = pdf.get_x()
         y = pdf.get_y()
         for i, val in enumerate(col_values):
             pdf.multi_cell(col_widths[i], 6, val, border=1, align="L")
-            pdf.set_xy(x + col_widths[i], y)
+            pdf.set_xy(x + col_widths[i], y)  # reset posisi ke kanan
             x += col_widths[i]
         pdf.set_y(y + row_height)
 
