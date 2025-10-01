@@ -20,7 +20,7 @@ def bersihkan_jurnal(df):
     # Normalisasi nama kolom
     df.columns = df.columns.str.strip().str.lower()
 
-    # Ganti alias nama kolom
+    # Alias nama kolom
     rename_map = {
         "debet": "debit",
         "no": "nomor voucher jurnal",
@@ -33,14 +33,22 @@ def bersihkan_jurnal(df):
     if "akun" in df.columns:
         df = df[df["akun"].str.lower() != "akun"]
 
-    # Bersihkan angka debit/kredit (format Indonesia)
+    # Format tanggal jadi dd/mm/yyyy
+    if "tanggal" in df.columns:
+        df["tanggal"] = pd.to_datetime(df["tanggal"], errors="coerce").dt.strftime("%d/%m/%Y")
+
+    # Pastikan No Akun jadi string biar tidak korup
+    if "no akun" in df.columns:
+        df["no akun"] = df["no akun"].astype(str).str.strip()
+
+    # Bersihkan angka debit/kredit
     for col in ["debit", "kredit"]:
         if col in df.columns:
             df[col] = (
                 df[col]
                 .astype(str)
-                .str.replace(r"\.", "", regex=True)   # hapus titik ribuan
-                .str.replace(",", ".", regex=True)    # koma → titik
+                .str.replace(".", "", regex=False)   # hapus titik ribuan
+                .str.replace(",", ".", regex=False)  # koma → titik
                 .replace("", "0")
             )
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
@@ -153,9 +161,9 @@ uploaded_file = st.file_uploader("Upload Daftar Jurnal (Excel/CSV)", type=["xlsx
 
 if uploaded_file:
     if uploaded_file.name.endswith("csv"):
-        df = pd.read_csv(uploaded_file)
+        df = pd.read_csv(uploaded_file, dtype=str)  # baca semua sebagai string biar aman
     else:
-        df = pd.read_excel(uploaded_file)
+        df = pd.read_excel(uploaded_file, dtype=str)
 
     # Bersihkan data
     df = bersihkan_jurnal(df)
