@@ -88,11 +88,12 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     # Tabel Jurnal
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(30, 8, "Tanggal", 1)
-    pdf.cell(30, 8, "Akun", 1)
-    pdf.cell(60, 8, "Nama Akun", 1)
-    pdf.cell(30, 8, "Debit", 1, align="R")
-    pdf.cell(30, 8, "Kredit", 1, align="R")
+    pdf.cell(25, 8, "Tanggal", 1)
+    pdf.cell(25, 8, "Akun", 1)
+    pdf.cell(50, 8, "Nama Akun", 1)
+    pdf.cell(40, 8, "Deskripsi", 1)
+    pdf.cell(25, 8, "Debit", 1, align="R")
+    pdf.cell(25, 8, "Kredit", 1, align="R")
     pdf.ln()
 
     total_debit = 0
@@ -103,11 +104,12 @@ def buat_voucher(jurnal_df, no_voucher, settings):
         debit_val = int(row.get("debit", 0)) if pd.notna(row.get("debit", 0)) else 0
         kredit_val = int(row.get("kredit", 0)) if pd.notna(row.get("kredit", 0)) else 0
 
-        pdf.cell(30, 8, str(row.get('tanggal', '')), 1)
-        pdf.cell(30, 8, str(row.get('no akun', '')), 1)
-        pdf.cell(60, 8, str(row.get('akun', '')), 1)
-        pdf.cell(30, 8, f"{debit_val:,}", 1, align="R")
-        pdf.cell(30, 8, f"{kredit_val:,}", 1, align="R")
+        pdf.cell(25, 8, str(row.get('tanggal', '')), 1)
+        pdf.cell(25, 8, str(row.get('no akun', '')), 1)
+        pdf.cell(50, 8, str(row.get('akun', '')), 1)
+        pdf.cell(40, 8, str(row.get('deskripsi', '')), 1)
+        pdf.cell(25, 8, f"{debit_val:,}".replace(",", "."), 1, align="R")
+        pdf.cell(25, 8, f"{kredit_val:,}".replace(",", "."), 1, align="R")
         pdf.ln()
 
         total_debit += debit_val
@@ -115,9 +117,9 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     # Total
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(120, 8, "Total", 1)
-    pdf.cell(30, 8, f"{total_debit:,}", 1, align="R")
-    pdf.cell(30, 8, f"{total_kredit:,}", 1, align="R")
+    pdf.cell(140, 8, "Total", 1)
+    pdf.cell(25, 8, f"{total_debit:,}".replace(",", "."), 1, align="R")
+    pdf.cell(25, 8, f"{total_kredit:,}".replace(",", "."), 1, align="R")
     pdf.ln()
 
     # Tentukan nilai terbilang
