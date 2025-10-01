@@ -122,19 +122,21 @@ if uploaded_file:
     else:
         df = pd.read_excel(uploaded_file)
 
-    # Normalisasi nama kolom
+    # Normalisasi & pastikan kolom unik
     df = df.rename(columns=lambda x: str(x).strip())
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
+    # Alias kolom
     if "Debet" in df.columns: df.rename(columns={"Debet": "Debit"}, inplace=True)
     if "No Akun" in df.columns: df.rename(columns={"No Akun": "Akun"}, inplace=True)
-
-    # Tambahkan No Jurnal jika tidak ada
-    if "No Jurnal" not in df.columns:
-        if "No" in df.columns:
-            df.rename(columns={"No": "No Jurnal"}, inplace=True)
+    if "No" in df.columns and "No Jurnal" not in df.columns:
+        df.rename(columns={"No": "No Jurnal"}, inplace=True)
 
     # Pastikan numeric
-    df["Debit"] = pd.to_numeric(df.get("Debit", 0), errors="coerce").fillna(0)
-    df["Kredit"] = pd.to_numeric(df.get("Kredit", 0), errors="coerce").fillna(0)
+    if "Debit" in df.columns:
+        df["Debit"] = pd.to_numeric(df["Debit"], errors="coerce").fillna(0)
+    if "Kredit" in df.columns:
+        df["Kredit"] = pd.to_numeric(df["Kredit"], errors="coerce").fillna(0)
 
     st.subheader("Preview Data Jurnal")
     st.dataframe(df.head())
@@ -152,18 +154,20 @@ if uploaded_file:
 
     with tab2:
         st.subheader("Laporan Laba Rugi")
-        laba_rugi = (
-            df[df['Akun'].astype(str).str.startswith(("4", "5"))]
-            .groupby("Akun")[["Debit", "Kredit"]]
-            .sum()
-        )
-        st.dataframe(laba_rugi)
+        if "Akun" in df.columns:
+            laba_rugi = (
+                df[df['Akun'].astype(str).str.startswith(("4", "5"))]
+                .groupby("Akun")[["Debit", "Kredit"]]
+                .sum()
+            )
+            st.dataframe(laba_rugi)
 
     with tab3:
         st.subheader("Laporan Neraca")
-        neraca = (
-            df[df['Akun'].astype(str).str.startswith(("1", "2", "3"))]
-            .groupby("Akun")[["Debit", "Kredit"]]
-            .sum()
-        )
-        st.dataframe(neraca)
+        if "Akun" in df.columns:
+            neraca = (
+                df[df['Akun'].astype(str).str.startswith(("1", "2", "3"))]
+                .groupby("Akun")[["Debit", "Kredit"]]
+                .sum()
+            )
+            st.dataframe(neraca)
