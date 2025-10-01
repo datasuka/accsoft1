@@ -29,9 +29,8 @@ def buat_voucher(df, no_voucher, settings):
     pdf.set_left_margin(15)
     pdf.set_right_margin(15)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 12)
 
-    # Header perusahaan
+    # Header perusahaan + logo
     if settings.get("logo"):
         pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))
 
@@ -52,23 +51,22 @@ def buat_voucher(df, no_voucher, settings):
 
     # ambil data voucher
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
+    first_desc = str(data["Deskripsi"].iloc[0]) if not data.empty else "-"
 
     # table header
-    col_widths = [28, 20, 70, 35, 25, 25]  # deskripsi dibuang dari tabel utama
-    headers = ["Tanggal","Akun","Nama Akun","-","Debit","Kredit"]
+    col_widths = [28, 20, 80, 30, 30]
+    headers = ["Tanggal","Akun","Nama Akun","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
-    for i,h in enumerate(headers):
-        if i == 3:  # kolom dummy deskripsi
-            continue
-        pdf.cell(col_widths[i], 8, h if h != "-" else "", border=1, align="C")
+    for h,w in zip(headers,col_widths):
+        pdf.cell(w, 8, h, border=1, align="C")
     pdf.ln()
 
     total_debit, total_kredit = 0,0
     pdf.set_font("Arial","",9)
 
-    first_desc = ""
-    for idx, row in data.iterrows():
+    # isi tabel
+    for _, row in data.iterrows():
         debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
         kredit_val = int(row["Kredit"]) if pd.notna(row["Kredit"]) else 0
 
@@ -77,53 +75,59 @@ def buat_voucher(df, no_voucher, settings):
         except:
             tgl = str(row["Tanggal"])
 
-        if first_desc == "" and str(row["Deskripsi"]).strip():
-            first_desc = str(row["Deskripsi"])
-
         values = [
             tgl,
             str(row["No Akun"]),
             str(row["Akun"]),
-            "",  # dummy col
             f"{debit_val:,}".replace(",", "."),
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        row_height = 6
+        line_counts = []
+        for i, (val, w) in enumerate(zip(values, col_widths)):
+            if i in [3,4]:  
+                line_counts.append(1)
+            else:
+                lines = pdf.multi_cell(w, 6, val, split_only=True)
+                line_counts.append(len(lines))
+        max_lines = max(line_counts)
+        row_height = max_lines * 6
+
         x_start = pdf.get_x()
         y_start = pdf.get_y()
         for i, (val, w) in enumerate(zip(values, col_widths)):
-            if i == 3:  # skip deskripsi col
-                continue
             pdf.rect(x_start, y_start, w, row_height)
             pdf.set_xy(x_start, y_start)
-            align = "R" if i in [4,5] else "L"
-            pdf.multi_cell(w, 6, val, align=align)
+
+            if i in [3,4]:
+                pdf.cell(w, row_height, val, align="R")
+            else:
+                pdf.multi_cell(w, 6, val, align="L")
             x_start += w
         pdf.set_y(y_start + row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
 
-    # total row
+    # --- Total row ---
     pdf.set_font("Arial","B",9)
     pdf.cell(sum(col_widths[:-2]),8,"Total",border=1,align="L")
     pdf.cell(col_widths[-2],8,f"{total_debit:,}".replace(",", "."),border=1,align="R")
     pdf.cell(col_widths[-1],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
 
-    # --- Tambahan baris Terbilang (dalam tabel) ---
+    # --- Terbilang row ---
     pdf.set_font("Arial","I",9)
     terbilang_text = f"Terbilang : {num2words(total_debit, lang='id')} rupiah"
     pdf.multi_cell(sum(col_widths), 6, terbilang_text, border=1, align="L")
 
-    # --- Tambahan baris Deskripsi (dalam tabel, wrap) ---
+    # --- Deskripsi row ---
     pdf.set_font("Arial","",9)
     desc_text = f"Deskripsi : {first_desc}" if first_desc.strip() else "Deskripsi : -"
     pdf.multi_cell(sum(col_widths), 6, desc_text, border=1, align="L")
 
     # tanda tangan
-    pdf.ln(15)
+    pdf.ln(10)
     pdf.set_font("Arial","",10)
     pdf.cell(90,6,"Direktur,",align="C")
     pdf.cell(90,6,"Finance,",align="C",ln=1)
