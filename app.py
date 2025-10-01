@@ -84,17 +84,27 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # tinggi baris hanya dari Deskripsi
+        # Hitung tinggi baris hanya dari Deskripsi
         n_lines = get_num_lines(pdf, values[3], col_widths[3])
         row_height = n_lines * 6
 
+        # Simpan posisi awal
         x = pdf.get_x()
         y = pdf.get_y()
-        for i, val in enumerate(values):
-            pdf.multi_cell(col_widths[i], row_height, str(val), border=1, align="L")
-            pdf.set_xy(x + col_widths[i], y)
-            x += col_widths[i]
-        pdf.set_y(y + row_height)
+
+        # Kolom selain Deskripsi
+        pdf.cell(col_widths[0], row_height, values[0], border=1, align="L")
+        pdf.cell(col_widths[1], row_height, values[1], border=1, align="L")
+        pdf.cell(col_widths[2], row_height, values[2], border=1, align="L")
+
+        # Deskripsi pakai multi_cell
+        pdf.multi_cell(col_widths[3], 6, values[3], border=1, align="L")
+
+        # Balik posisi untuk Debit & Kredit
+        pdf.set_xy(x + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3], y)
+        pdf.cell(col_widths[4], row_height, values[4], border=1, align="R")
+        pdf.cell(col_widths[5], row_height, values[5], border=1, align="R")
+        pdf.ln(row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
