@@ -53,8 +53,8 @@ def buat_voucher(df, no_voucher, settings):
     # ambil data voucher
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
-    # table header (tanpa Deskripsi)
-    col_widths = [35, 25, 75, 25, 25]
+    # table header (tanpa kolom deskripsi)
+    col_widths = [28, 20, 80, 30, 30]
     headers = ["Tanggal","Akun","Nama Akun","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
@@ -65,7 +65,8 @@ def buat_voucher(df, no_voucher, settings):
     total_debit, total_kredit = 0,0
     pdf.set_font("Arial","",9)
 
-    for _, row in data.iterrows():
+    first_desc = ""
+    for i, row in data.iterrows():
         debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
         kredit_val = int(row["Kredit"]) if pd.notna(row["Kredit"]) else 0
 
@@ -82,10 +83,10 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # hitung tinggi baris
+        # tinggi baris wrap
         line_counts = []
-        for i, (val, w) in enumerate(zip(values, col_widths)):
-            if i in [3,4]:
+        for i2, (val, w) in enumerate(zip(values, col_widths)):
+            if i2 in [3,4]:  
                 line_counts.append(1)
             else:
                 lines = pdf.multi_cell(w, 6, val, split_only=True)
@@ -93,50 +94,67 @@ def buat_voucher(df, no_voucher, settings):
         max_lines = max(line_counts)
         row_height = max_lines * 6
 
-        # gambar isi tabel
         x_start = pdf.get_x()
         y_start = pdf.get_y()
-        for i, (val, w) in enumerate(zip(values, col_widths)):
+        for i2, (val, w) in enumerate(zip(values, col_widths)):
             pdf.rect(x_start, y_start, w, row_height)
             pdf.set_xy(x_start, y_start)
-            align = "R" if i in [3,4] else "L"
-            if i in [3,4]:
-                pdf.cell(w, row_height, val, align=align)
+
+            if i2 in [3,4]:
+                pdf.cell(w, row_height, val, align="R")
             else:
-                pdf.multi_cell(w, 6, val, align=align)
+                pdf.multi_cell(w, 6, val, align="L")
             x_start += w
         pdf.set_y(y_start + row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
+        if first_desc == "" and str(row["Deskripsi"]).strip():
+            first_desc = str(row["Deskripsi"]).strip()
 
     # total row
     pdf.set_font("Arial","B",9)
-    pdf.cell(sum(col_widths[:-2]),8,"Total",border=1,align="L")
-    pdf.cell(col_widths[-2],8,f"{total_debit:,}".replace(",", "."),border=1,align="R")
-    pdf.cell(col_widths[-1],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
+    pdf.cell(sum(col_widths[:-2]),8,"Total",border=1,align="R")
+    pdf.cell(col_widths[3],8,f"{total_debit:,}".replace(",", "."),border=1,align="R")
+    pdf.cell(col_widths[4],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
 
-    page_width = sum(col_widths)
-
-    # baris terbilang (border penuh)
+    # Terbilang row
     pdf.set_font("Arial","I",9)
-    terbilang_text = f"Terbilang : {num2words(total_debit, lang='id')} rupiah"
-    pdf.cell(page_width,8,terbilang_text,border=1,ln=1,align="L")
+    pdf.cell(sum(col_widths),8,f"Terbilang : {num2words(total_debit, lang='id')} rupiah",border=1,align="L")
+    pdf.ln()
 
-    # baris deskripsi (border penuh, kaya total)
-    first_desc = str(data.iloc[0]["Deskripsi"]) if not data.empty else ""
-    pdf.set_font("Arial","",9)
-    pdf.multi_cell(page_width,8,f"Deskripsi : {first_desc}",border=1,align="L")
+    # Deskripsi row
+    if first_desc:
+        pdf.set_font("Arial","",9)
+        pdf.multi_cell(sum(col_widths),8,f"Deskripsi : {first_desc}",border=1,align="L")
+        pdf.ln()
 
     # tanda tangan
     pdf.ln(15)
     pdf.set_font("Arial","",10)
-    pdf.cell(90,6,"Direktur,",align="C")
-    pdf.cell(90,6,"Finance,",align="C",ln=1)
-    pdf.ln(20)
-    pdf.cell(90,6,f"({settings.get('direktur','')})",align="C")
-    pdf.cell(90,6,f"({settings.get('finance','')})",align="C",ln=1)
+
+    # ambil custom tanda tangan
+    ttd_fields = []
+    for i in range(1,5):
+        role = settings.get(f"ttd{i}", "").strip()
+        if role:
+            ttd_fields.append(role)
+
+    n = len(ttd_fields)
+    if n > 0:
+        col_width = (pdf.w - pdf.l_margin - pdf.r_margin) / n
+
+        # baris jabatan
+        for role in ttd_fields:
+            pdf.cell(col_width,6, role+",", align="C")
+        pdf.ln(20)
+
+        # baris nama
+        for role in ttd_fields:
+            nama = settings.get(f"nama_{role}","")
+            pdf.cell(col_width,6,f"({nama})",align="C")
+        pdf.ln(10)
 
     buffer = BytesIO()
     pdf.output(buffer)
@@ -151,13 +169,19 @@ st.sidebar.header("⚙️ Pengaturan Perusahaan")
 settings = {}
 settings["perusahaan"] = st.sidebar.text_input("Nama Perusahaan")
 settings["alamat"] = st.sidebar.text_area("Alamat Perusahaan")
-settings["direktur"] = st.sidebar.text_input("Nama Direktur")
-settings["finance"] = st.sidebar.text_input("Nama Finance")
 settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 50, 20)
 logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
 if logo_file:
     tmp = BytesIO(logo_file.read())
     settings["logo"] = tmp
+
+# Penandatangan Custom
+st.sidebar.subheader("✍️ Penandatangan (max 4)")
+for i in range(1,5):
+    jabatan = st.sidebar.text_input(f"Jabatan TTD {i}", key=f"jab{i}")
+    settings[f"ttd{i}"] = jabatan
+    if jabatan:
+        settings[f"nama_{jabatan}"] = st.sidebar.text_input(f"Nama ({jabatan})", key=f"nama_{i}")
 
 # Main content
 file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx","xls"])
