@@ -60,18 +60,22 @@ def buat_voucher(jurnal_df, no_jurnal, settings):
     total = 0
     pdf.set_font("Arial", '', 10)
     for _, row in data.iterrows():
+        debit_val = row.get("Debit", 0) if pd.notna(row.get("Debit", 0)) else 0
+        kredit_val = row.get("Kredit", 0) if pd.notna(row.get("Kredit", 0)) else 0
+
         pdf.cell(30, 8, str(row.get('Tanggal', '')), 1)
         pdf.cell(40, 8, str(row.get('Akun', row.get('No Akun', ''))), 1)
-        pdf.cell(50, 8, str(row['Deskripsi']), 1)
-        pdf.cell(30, 8, f"{row['Debit']:.0f}", 1, align="R")
-        pdf.cell(30, 8, f"{row['Kredit']:.0f}", 1, align="R")
+        pdf.cell(50, 8, str(row.get('Deskripsi', '')), 1)
+        pdf.cell(30, 8, f"{int(debit_val):,}", 1, align="R")
+        pdf.cell(30, 8, f"{int(kredit_val):,}", 1, align="R")
         pdf.ln()
-        total += row['Debit']
+
+        total += debit_val
 
     # Total
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(120, 8, "Total", 1)
-    pdf.cell(30, 8, f"{total:.0f}", 1, align="R")
+    pdf.cell(30, 8, f"{int(total):,}", 1, align="R")
     pdf.cell(30, 8, "", 1)
     pdf.ln()
 
@@ -128,6 +132,10 @@ if uploaded_file:
         if "No" in df.columns:
             df.rename(columns={"No": "No Jurnal"}, inplace=True)
 
+    # Pastikan numeric
+    df["Debit"] = pd.to_numeric(df.get("Debit", 0), errors="coerce").fillna(0)
+    df["Kredit"] = pd.to_numeric(df.get("Kredit", 0), errors="coerce").fillna(0)
+
     st.subheader("Preview Data Jurnal")
     st.dataframe(df.head())
 
@@ -144,12 +152,12 @@ if uploaded_file:
 
     with tab2:
         st.subheader("Laporan Laba Rugi")
-        laba_rugi = df[df['Akun'].astype(str).str.startswith(("4","5"))] \
+        laba_rugi = df[df['Akun'].astype(str).str.startswith(("4","5"))] \ 
                       .groupby("Akun")[["Debit","Kredit"]].sum()
         st.dataframe(laba_rugi)
 
     with tab3:
         st.subheader("Laporan Neraca")
-        neraca = df[df['Akun'].astype(str).str.startswith(("1","2","3"))] \
+        neraca = df[df['Akun'].astype(str).str.startswith(("1","2","3"))] \ 
                     .groupby("Akun")[["Debit","Kredit"]].sum()
         st.dataframe(neraca)
