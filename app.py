@@ -26,7 +26,7 @@ def bersihkan_jurnal(df):
     df["Kredit"] = pd.to_numeric(df.get("Kredit", 0), errors="coerce").fillna(0)
     return df
 
-# --- generate voucher ---
+# --- generate voucher PDF ---
 def buat_voucher(df, no_voucher, settings):
     pdf = FPDF("P", "mm", "A4")
     pdf.add_page()
@@ -91,10 +91,6 @@ def buat_voucher(df, no_voucher, settings):
         row_height = max_lines * 6
 
         # Posisi awal
-        x = pdf.get_x()
-        y = pdf.get_y()
-
-        # Tanggal & No Akun
         pdf.cell(col_widths[0], row_height, values[0], border=1, align="L")
         pdf.cell(col_widths[1], row_height, values[1], border=1, align="L")
 
@@ -168,7 +164,20 @@ file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx","xls"])
 if file:
     df = pd.read_excel(file)
     df = bersihkan_jurnal(df)
-    st.dataframe(df.head())
+
+    # Preview per voucher
+    st.subheader("📋 Preview Jurnal")
+    for voucher_id, group in df.groupby("Nomor Voucher Jurnal"):
+        with st.expander(f"Voucher: {voucher_id}"):
+            try:
+                tanggal = pd.to_datetime(group["Tanggal"].iloc[0]).strftime("%d/%m/%Y")
+            except:
+                tanggal = str(group["Tanggal"].iloc[0])
+            st.markdown(f"**Tanggal:** {tanggal}")
+            st.markdown(f"**Nomor Voucher:** {voucher_id}")
+
+            preview = group[["No Akun","Akun","Deskripsi","Debet","Kredit"]]
+            st.dataframe(preview, use_container_width=True)
 
     no_voucher = st.selectbox("Pilih Nomor Voucher", df["Nomor Voucher Jurnal"].unique())
 
