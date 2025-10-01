@@ -38,7 +38,7 @@ def buat_voucher(df, no_voucher, settings):
 
     pdf.set_xy(0, 10)
     pdf.set_font("Arial", "B", 12)
-    pdf.multi_cell(210, 6, settings.get("perusahaan",""), align="C")
+    pdf.cell(210, 6, settings.get("perusahaan",""), ln=1, align="C")
 
     pdf.set_font("Arial", "", 10)
     pdf.multi_cell(210, 5, settings.get("alamat",""), align="C")
@@ -78,29 +78,40 @@ def buat_voucher(df, no_voucher, settings):
         values = [
             tgl,
             str(row["No Akun"]),
-            str(row["Akun"]),   # Nama Akun wrap
+            str(row["Akun"]),
             str(row["Deskripsi"]),
             f"{debit_val:,}".replace(",", "."),
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # Hitung tinggi baris
-        n_lines_nama = get_num_lines(pdf, values[2], col_widths[2])
-        n_lines_desc = get_num_lines(pdf, values[3], col_widths[3])
-        row_height = max(n_lines_nama, n_lines_desc) * 6
+        # Sinkronisasi multi-line
+        nama_lines = pdf.multi_cell(col_widths[2], 6, values[2], split_only=True)
+        desc_lines = pdf.multi_cell(col_widths[3], 6, values[3], split_only=True)
+        max_lines = max(len(nama_lines), len(desc_lines))
+        row_height = max_lines * 6
 
-        # Tanggal & Akun
+        # Posisi awal
+        x = pdf.get_x()
+        y = pdf.get_y()
+
+        # Tanggal & No Akun
         pdf.cell(col_widths[0], row_height, values[0], border=1, align="L")
         pdf.cell(col_widths[1], row_height, values[1], border=1, align="L")
 
-        # Nama Akun wrap
-        x2,y2 = pdf.get_x(), pdf.get_y()
-        pdf.multi_cell(col_widths[2], 6, values[2], border=1, align="L")
+        # Nama Akun sinkron
+        x2, y2 = pdf.get_x(), pdf.get_y()
+        for i in range(max_lines):
+            line = nama_lines[i] if i < len(nama_lines) else ""
+            border = "LR" if i < max_lines-1 else 1
+            pdf.multi_cell(col_widths[2], 6, line, border=border, align="L")
         pdf.set_xy(x2+col_widths[2], y2)
 
-        # Deskripsi wrap
-        x3,y3 = pdf.get_x(), pdf.get_y()
-        pdf.multi_cell(col_widths[3], 6, values[3], border=1, align="L")
+        # Deskripsi sinkron
+        x3, y3 = pdf.get_x(), pdf.get_y()
+        for i in range(max_lines):
+            line = desc_lines[i] if i < len(desc_lines) else ""
+            border = "LR" if i < max_lines-1 else 1
+            pdf.multi_cell(col_widths[3], 6, line, border=border, align="L")
         pdf.set_xy(x3+col_widths[3], y3)
 
         # Debit & Kredit
