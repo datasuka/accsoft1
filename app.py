@@ -29,12 +29,16 @@ def buat_voucher(df, no_voucher, settings):
     pdf = FPDF("P", "mm", "A4")
     pdf.add_page()
 
+    # margin kanan dikasih 10mm
+    pdf.set_left_margin(10)
+    pdf.set_right_margin(10)
+
     # --- HEADER PERUSAHAAN ---
     if settings.get("logo"):
-        pdf.image(settings["logo"], 10, 8, settings.get("logo_size", 20))
+        pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))  # logo di kiri atas
 
-    pdf.set_font("Arial", "B", 12)
     pdf.set_xy(0, 10)
+    pdf.set_font("Arial", "B", 12)
     pdf.cell(210, 6, settings.get("perusahaan",""), ln=1, align="C")
 
     pdf.set_font("Arial", "", 10)
