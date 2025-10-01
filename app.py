@@ -86,7 +86,7 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(200, 8, f"No Voucher : {no_voucher}", ln=True, align="C")
     pdf.ln(5)
 
-    # Tabel Jurnal
+    # Tabel Header
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(25, 8, "Tanggal", 1)
     pdf.cell(25, 8, "Akun", 1)
@@ -104,13 +104,39 @@ def buat_voucher(jurnal_df, no_voucher, settings):
         debit_val = int(row.get("debit", 0)) if pd.notna(row.get("debit", 0)) else 0
         kredit_val = int(row.get("kredit", 0)) if pd.notna(row.get("kredit", 0)) else 0
 
-        pdf.cell(25, 8, str(row.get('tanggal', '')), 1)
-        pdf.cell(25, 8, str(row.get('no akun', '')), 1)
-        pdf.cell(50, 8, str(row.get('akun', '')), 1)
-        pdf.cell(40, 8, str(row.get('deskripsi', '')), 1)
-        pdf.cell(25, 8, f"{debit_val:,}".replace(",", "."), 1, align="R")
-        pdf.cell(25, 8, f"{kredit_val:,}".replace(",", "."), 1, align="R")
-        pdf.ln()
+        # hitung tinggi baris berdasarkan deskripsi
+        y_before = pdf.get_y()
+        x_before = pdf.get_x()
+
+        # Tanggal
+        pdf.multi_cell(25, 8, str(row.get('tanggal', '')), border=1)
+        y_after = pdf.get_y()
+        row_height = y_after - y_before
+        pdf.set_xy(x_before + 25, y_before)
+
+        # No Akun
+        pdf.multi_cell(25, row_height, str(row.get('no akun', '')), border=1)
+        pdf.set_xy(x_before + 25 + 25, y_before)
+
+        # Nama Akun
+        pdf.multi_cell(50, row_height, str(row.get('akun', '')), border=1)
+        pdf.set_xy(x_before + 25 + 25 + 50, y_before)
+
+        # Deskripsi (wrap text)
+        pdf.multi_cell(40, 8, str(row.get('deskripsi', '')), border=1)
+        y_tmp = pdf.get_y()
+        row_height = max(row_height, y_tmp - y_before)
+        pdf.set_xy(x_before + 25 + 25 + 50 + 40, y_before)
+
+        # Debit
+        pdf.multi_cell(25, row_height, f"{debit_val:,}".replace(",", "."), border=1, align="R")
+        pdf.set_xy(x_before + 25 + 25 + 50 + 40 + 25, y_before)
+
+        # Kredit
+        pdf.multi_cell(25, row_height, f"{kredit_val:,}".replace(",", "."), border=1, align="R")
+
+        # Set Y ke bawah baris berikutnya
+        pdf.set_y(y_before + row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
