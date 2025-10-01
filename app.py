@@ -142,35 +142,13 @@ def angka_terbilang(n):
 # ==========================
 st.title("📑 Mini Akunting - Voucher Jurnal")
 
-# Sidebar Settings
+# Sidebar Settings (langsung ambil value)
 st.sidebar.header("⚙️ Pengaturan Perusahaan")
-with st.sidebar.form("settings_form"):
-    nama_perusahaan = st.text_input("Nama Perusahaan")
-    alamat = st.text_area("Alamat Perusahaan")
-    direktur = st.text_input("Nama Direktur")
-    finance = st.text_input("Nama Finance")
-    logo_file = st.file_uploader("Upload Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
-    submit_settings = st.form_submit_button("Simpan Pengaturan")
-
-# default kosong
-settings = {
-    "nama_perusahaan": "",
-    "alamat": "",
-    "direktur": "",
-    "finance": ""
-}
-
-if submit_settings:
-    settings["nama_perusahaan"] = nama_perusahaan
-    settings["alamat"] = alamat
-    settings["direktur"] = direktur
-    settings["finance"] = finance
-    if logo_file:
-        img = Image.open(logo_file)
-        logo_path = "logo.png"
-        img.save(logo_path)
-        settings["logo"] = logo_path
-    st.sidebar.success("✅ Pengaturan disimpan!")
+nama_perusahaan = st.sidebar.text_input("Nama Perusahaan")
+alamat = st.sidebar.text_area("Alamat Perusahaan")
+direktur = st.sidebar.text_input("Nama Direktur")
+finance = st.sidebar.text_input("Nama Finance")
+logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
 
 # Upload file
 uploaded_file = st.file_uploader("Upload Daftar Jurnal (Excel)", type=["xlsx", "xls", "csv"])
@@ -183,6 +161,19 @@ if uploaded_file:
     pilih_no = st.selectbox("Pilih Nomor Voucher", vouchers)
 
     if st.button("Cetak Voucher Jurnal"):
+        # Ambil settings saat tombol ditekan
+        settings = {
+            "nama_perusahaan": nama_perusahaan,
+            "alamat": alamat,
+            "direktur": direktur,
+            "finance": finance
+        }
+        if logo_file:
+            img = Image.open(logo_file)
+            logo_path = "logo.png"
+            img.save(logo_path)
+            settings["logo"] = logo_path
+
         subset = df[df["Nomor Voucher Jurnal"] == pilih_no]
         file_pdf = buat_voucher(subset, pilih_no, settings)
         with open(file_pdf, "rb") as f:
