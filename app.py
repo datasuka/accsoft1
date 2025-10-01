@@ -3,6 +3,7 @@ import pandas as pd
 from fpdf import FPDF
 from num2words import num2words
 from PIL import Image
+import io
 
 # --- Fungsi Terbilang Indonesia ---
 def terbilang(nominal):
@@ -84,9 +85,11 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(100, 6, settings.get("direktur", ""), align="C")
     pdf.cell(90, 6, settings.get("finance", ""), align="C")
 
-    filename = f"voucher_{no_voucher}.pdf"
-    pdf.output(filename)
-    return filename
+    # Simpan ke memori (bukan file fisik)
+    buf = io.BytesIO()
+    pdf.output(buf)
+    pdf_data = buf.getvalue()
+    return pdf_data
 
 # --- STREAMLIT APP ---
 st.title("📄 Cetak Voucher Jurnal")
@@ -127,6 +130,10 @@ if uploaded_file:
         no_list = df["nomor voucher jurnal"].unique()
         pilih_no = st.selectbox("Pilih Nomor Voucher", no_list)
         if st.button("Generate Voucher PDF"):
-            filename = buat_voucher(df, pilih_no, settings)
-            with open(filename, "rb") as f:
-                st.download_button("Download Voucher PDF", f, file_name=filename)
+            pdf_bytes = buat_voucher(df, pilih_no, settings)
+            st.download_button(
+                "Download Voucher PDF",
+                data=pdf_bytes,
+                file_name=f"voucher_{pilih_no}.pdf",
+                mime="application/pdf"
+            )
