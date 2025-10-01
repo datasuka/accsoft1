@@ -38,7 +38,7 @@ def bersihkan_jurnal(df):
     if "tanggal" in df.columns:
         df["tanggal"] = pd.to_datetime(df["tanggal"], errors="coerce").dt.strftime("%d/%m/%Y")
 
-    # Pastikan No Akun jadi string biar tidak korup
+    # Pastikan No Akun jadi string
     if "no akun" in df.columns:
         df["no akun"] = df["no akun"].astype(str).str.strip()
 
@@ -113,14 +113,14 @@ def buat_voucher(jurnal_df, no_voucher, settings):
         ]
 
         # --- Hitung tinggi baris maksimum ---
-        line_heights = []
+        line_counts = []
         for i, val in enumerate(col_values):
-            # approx jumlah baris berdasarkan panjang teks & lebar kolom
-            n_lines = math.ceil(pdf.get_string_width(val) / (col_widths[i] - 2)) if val else 1
-            line_heights.append(n_lines * 6)
-        row_height = max(line_heights)
+            text_width = pdf.get_string_width(val)
+            n_lines = max(1, math.ceil(text_width / (col_widths[i] - 2)))
+            line_counts.append(n_lines)
+        row_height = max(line_counts) * 6
 
-        # --- Render baris ---
+        # --- Cetak setiap kolom ---
         x = pdf.get_x()
         y = pdf.get_y()
         for i, val in enumerate(col_values):
@@ -139,7 +139,7 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(col_widths[-1], 8, f"{total_kredit:,}".replace(",", "."), 1, align="R")
     pdf.ln()
 
-    # Tentukan nilai terbilang
+    # Terbilang
     nilai_terbilang = total_debit if total_debit != 0 else total_kredit
     pdf.set_font("Arial", 'I', 9)
     pdf.multi_cell(0, 6, f"Terbilang: {terbilang(int(nilai_terbilang))} rupiah")
