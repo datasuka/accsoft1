@@ -13,7 +13,7 @@ def terbilang(nominal):
 
 # --- Fungsi Generate Voucher ---
 def buat_voucher(jurnal_df, no_jurnal, settings):
-    data = jurnal_df[jurnal_df['No Jurnal'] == no_jurnal]
+    data = jurnal_df[jurnal_df['no jurnal'] == no_jurnal]
 
     pdf = FPDF()
     pdf.add_page()
@@ -42,8 +42,8 @@ def buat_voucher(jurnal_df, no_jurnal, settings):
     pdf.cell(200, 8, f"No Voucher : {no_jurnal}", ln=True, align="C")
 
     # Subjek
-    if "Subjek" in data.columns and data["Subjek"].notna().any():
-        subjek = data["Subjek"].iloc[0]
+    if "subjek" in data.columns and data["subjek"].notna().any():
+        subjek = data["subjek"].iloc[0]
         pdf.cell(200, 6, f"Subjek : {subjek}", ln=True)
 
     pdf.ln(5)
@@ -60,12 +60,12 @@ def buat_voucher(jurnal_df, no_jurnal, settings):
     total = 0
     pdf.set_font("Arial", '', 10)
     for _, row in data.iterrows():
-        debit_val = row.get("Debit", 0) if pd.notna(row.get("Debit", 0)) else 0
-        kredit_val = row.get("Kredit", 0) if pd.notna(row.get("Kredit", 0)) else 0
+        debit_val = row.get("debit", 0) if pd.notna(row.get("debit", 0)) else 0
+        kredit_val = row.get("kredit", 0) if pd.notna(row.get("kredit", 0)) else 0
 
-        pdf.cell(30, 8, str(row.get('Tanggal', '')), 1)
-        pdf.cell(40, 8, str(row.get('Akun', row.get('No Akun', ''))), 1)
-        pdf.cell(50, 8, str(row.get('Deskripsi', '')), 1)
+        pdf.cell(30, 8, str(row.get('tanggal', '')), 1)
+        pdf.cell(40, 8, str(row.get('akun', row.get('no akun', ''))), 1)
+        pdf.cell(50, 8, str(row.get('deskripsi', '')), 1)
         pdf.cell(30, 8, f"{int(debit_val):,}", 1, align="R")
         pdf.cell(30, 8, f"{int(kredit_val):,}", 1, align="R")
         pdf.ln()
@@ -122,21 +122,26 @@ if uploaded_file:
     else:
         df = pd.read_excel(uploaded_file)
 
-    # Normalisasi & pastikan kolom unik
-    df = df.rename(columns=lambda x: str(x).strip())
-    df = df.loc[:, ~df.columns.duplicated()].copy()
+    # --- Normalisasi kolom ---
+    df.columns = df.columns.str.strip().str.lower()
 
-    # Alias kolom
-    if "Debet" in df.columns: df.rename(columns={"Debet": "Debit"}, inplace=True)
-    if "No Akun" in df.columns: df.rename(columns={"No Akun": "Akun"}, inplace=True)
-    if "No" in df.columns and "No Jurnal" not in df.columns:
-        df.rename(columns={"No": "No Jurnal"}, inplace=True)
+    # Buat nama kolom unik otomatis (jika ada duplikat)
+    from pandas.io.parsers.base_parser import ParserBase
+    df.columns = ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
+
+    # Alias umum
+    if "debet" in df.columns and "debit" not in df.columns:
+        df.rename(columns={"debet": "debit"}, inplace=True)
+    if "no" in df.columns and "no jurnal" not in df.columns:
+        df.rename(columns={"no": "no jurnal"}, inplace=True)
+    if "no akun" in df.columns and "akun" not in df.columns:
+        df.rename(columns={"no akun": "akun"}, inplace=True)
 
     # Pastikan numeric
-    if "Debit" in df.columns:
-        df["Debit"] = pd.to_numeric(df["Debit"], errors="coerce").fillna(0)
-    if "Kredit" in df.columns:
-        df["Kredit"] = pd.to_numeric(df["Kredit"], errors="coerce").fillna(0)
+    if "debit" in df.columns:
+        df["debit"] = pd.to_numeric(df["debit"], errors="coerce").fillna(0)
+    if "kredit" in df.columns:
+        df["kredit"] = pd.to_numeric(df["kredit"], errors="coerce").fillna(0)
 
     st.subheader("Preview Data Jurnal")
     st.dataframe(df.head())
@@ -145,29 +150,30 @@ if uploaded_file:
     tab1, tab2, tab3 = st.tabs(["📄 Voucher Jurnal", "📊 Laba Rugi", "📊 Neraca"])
 
     with tab1:
-        no_list = df["No Jurnal"].unique()
-        pilih_no = st.selectbox("Pilih No Jurnal", no_list)
-        if st.button("Generate Voucher PDF"):
-            filename = buat_voucher(df, pilih_no, settings)
-            with open(filename, "rb") as f:
-                st.download_button("Download Voucher PDF", f, file_name=filename)
+        if "no jurnal" in df.columns:
+            no_list = df["no jurnal"].unique()
+            pilih_no = st.selectbox("Pilih No Jurnal", no_list)
+            if st.button("Generate Voucher PDF"):
+                filename = buat_voucher(df, pilih_no, settings)
+                with open(filename, "rb") as f:
+                    st.download_button("Download Voucher PDF", f, file_name=filename)
 
     with tab2:
         st.subheader("Laporan Laba Rugi")
-        if "Akun" in df.columns:
+        if "akun" in df.columns:
             laba_rugi = (
-                df[df['Akun'].astype(str).str.startswith(("4", "5"))]
-                .groupby("Akun")[["Debit", "Kredit"]]
+                df[df['akun'].astype(str).str.startswith(("4", "5"))]
+                .groupby("akun")[["debit", "kredit"]]
                 .sum()
             )
             st.dataframe(laba_rugi)
 
     with tab3:
         st.subheader("Laporan Neraca")
-        if "Akun" in df.columns:
+        if "akun" in df.columns:
             neraca = (
-                df[df['Akun'].astype(str).str.startswith(("1", "2", "3"))]
-                .groupby("Akun")[["Debit", "Kredit"]]
+                df[df['akun'].astype(str).str.startswith(("1", "2", "3"))]
+                .groupby("akun")[["debit", "kredit"]]
                 .sum()
             )
             st.dataframe(neraca)
