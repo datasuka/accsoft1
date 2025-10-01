@@ -119,12 +119,12 @@ def buat_voucher(df, no_voucher, settings):
 
     page_width = sum(col_widths)
 
-    # baris terbilang
+    # baris terbilang (border penuh, kaya tabel)
     pdf.set_font("Arial","I",9)
     terbilang_text = f"Terbilang : {num2words(total_debit, lang='id')} rupiah"
     pdf.multi_cell(page_width,8,terbilang_text,border=1,align="L")
 
-    # baris deskripsi
+    # baris deskripsi (border penuh, kaya tabel, auto-wrap)
     first_desc = str(data.iloc[0]["Deskripsi"]) if not data.empty else ""
     pdf.set_font("Arial","",9)
     pdf.multi_cell(page_width,8,f"Deskripsi : {first_desc}",border=1,align="L")
