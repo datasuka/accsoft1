@@ -69,8 +69,14 @@ def buat_voucher(df, no_voucher, settings):
         debit_val = int(row.get("Debet", 0)) if pd.notna(row.get("Debet")) else 0
         kredit_val = int(row.get("Kredit", 0)) if pd.notna(row.get("Kredit")) else 0
 
+        # format tanggal dd/mm/yyyy
+        try:
+            tgl = pd.to_datetime(row.get("Tanggal")).strftime("%d/%m/%Y")
+        except:
+            tgl = str(row.get("Tanggal"))
+
         values = [
-            row.get("Tanggal", ""),
+            tgl,
             str(row.get("No Akun", "")),
             str(row.get("Akun", "")),
             str(row.get("Deskripsi", "")),
@@ -78,14 +84,14 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # Hitung tinggi baris berdasar Deskripsi
+        # tinggi baris hanya dari Deskripsi
         n_lines = get_num_lines(pdf, values[3], col_widths[3])
         row_height = n_lines * 6
 
         x = pdf.get_x()
         y = pdf.get_y()
         for i, val in enumerate(values):
-            pdf.multi_cell(col_widths[i], 6, str(val), border=1, align="L")
+            pdf.multi_cell(col_widths[i], row_height, str(val), border=1, align="L")
             pdf.set_xy(x + col_widths[i], y)
             x += col_widths[i]
         pdf.set_y(y + row_height)
@@ -107,8 +113,8 @@ def buat_voucher(df, no_voucher, settings):
     # Tanda tangan
     pdf.ln(15)
     pdf.set_font("Arial", "", 10)
-    pdf.cell(95, 6, "Direktur,", align="C")
-    pdf.cell(95, 6, "Finance,", align="C", ln=1)
+    pdf.cell(95, 6, f"Direktur,\n\n\n\n({settings.get('direktur','')})", align="C")
+    pdf.cell(95, 6, f"Finance,\n\n\n\n({settings.get('finance','')})", align="C", ln=1)
 
     filename = f"voucher_{no_voucher.replace('/', '-')}.pdf"
     pdf.output(filename)
@@ -136,14 +142,19 @@ with st.sidebar.form("settings_form"):
     logo_file = st.file_uploader("Upload Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
     submit_settings = st.form_submit_button("Simpan Pengaturan")
 
-settings = {}
+# default kosong
+settings = {
+    "nama_perusahaan": "",
+    "alamat": "",
+    "direktur": "",
+    "finance": ""
+}
+
 if submit_settings:
-    settings = {
-        "nama_perusahaan": nama_perusahaan,
-        "alamat": alamat,
-        "direktur": direktur,
-        "finance": finance,
-    }
+    settings["nama_perusahaan"] = nama_perusahaan
+    settings["alamat"] = alamat
+    settings["direktur"] = direktur
+    settings["finance"] = finance
     if logo_file:
         img = Image.open(logo_file)
         logo_path = "logo.png"
