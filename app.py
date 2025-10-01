@@ -26,17 +26,20 @@ def bersihkan_jurnal(df):
 # --- generate voucher ---
 def buat_voucher(df, no_voucher, settings):
     pdf = FPDF("P", "mm", "A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(left=10, top=10, right=10)  # margin kanan kiri
     pdf.add_page()
 
-    # Header perusahaan + logo
+    # Header perusahaan dengan logo
     if settings.get("logo"):
-        pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))
+        pdf.image(settings["logo"], 10, 8, settings.get("logo_size", 25))
 
+    pdf.set_xy(40, 10)  # sejajarin logo & teks header
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(210, 6, settings.get("perusahaan",""), ln=1, align="C")
+    pdf.cell(160, 6, settings.get("perusahaan",""), ln=1, align="L")
+
+    pdf.set_x(40)
     pdf.set_font("Arial", "", 10)
-    pdf.multi_cell(210, 5, settings.get("alamat",""), align="C")
+    pdf.multi_cell(160, 5, settings.get("alamat",""), align="L")
     pdf.ln(5)
 
     # Judul
@@ -49,8 +52,8 @@ def buat_voucher(df, no_voucher, settings):
     # ambil data voucher
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
-    # table header
-    col_widths = [25, 20, 55, 55, 25, 25]
+    # table header (proporsional)
+    col_widths = [25, 20, 70, 45, 20, 20]
     headers = ["Tanggal","Akun","Nama Akun","Deskripsi","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
@@ -64,6 +67,7 @@ def buat_voucher(df, no_voucher, settings):
     for _, row in data.iterrows():
         debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
         kredit_val = int(row["Kredit"]) if pd.notna(row["Kredit"]) else 0
+
         try:
             tgl = pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y")
         except:
@@ -78,51 +82,24 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # hitung tinggi baris hanya untuk kolom teks
-        nama_lines = pdf.multi_cell(col_widths[2], 6, values[2], split_only=True)
-        desc_lines = pdf.multi_cell(col_widths[3], 6, values[3], split_only=True)
-        max_lines = max(len(nama_lines), len(desc_lines), 1)
+        # hitung tinggi baris (line count max)
+        line_counts = []
+        for val, w in zip(values, col_widths):
+            lines = pdf.multi_cell(w, 6, val, split_only=True)
+            line_counts.append(len(lines))
+        max_lines = max(line_counts)
         row_height = max_lines * 6
 
-        # gambar baris
-        x = pdf.l_margin
-        y = pdf.get_y()
-
-        # Tanggal
-        pdf.rect(x, y, col_widths[0], row_height)
-        pdf.multi_cell(col_widths[0], 6, values[0], border=0)
-        x += col_widths[0]
-        pdf.set_xy(x, y)
-
-        # Akun
-        pdf.rect(x, y, col_widths[1], row_height)
-        pdf.multi_cell(col_widths[1], 6, values[1], border=0)
-        x += col_widths[1]
-        pdf.set_xy(x, y)
-
-        # Nama Akun
-        pdf.rect(x, y, col_widths[2], row_height)
-        pdf.multi_cell(col_widths[2], 6, values[2], border=0)
-        x += col_widths[2]
-        pdf.set_xy(x, y)
-
-        # Deskripsi
-        pdf.rect(x, y, col_widths[3], row_height)
-        pdf.multi_cell(col_widths[3], 6, values[3], border=0)
-        x += col_widths[3]
-        pdf.set_xy(x, y)
-
-        # Debit (angka single line)
-        pdf.rect(x, y, col_widths[4], row_height)
-        pdf.cell(col_widths[4], row_height, values[4], border=0, align="R")
-        x += col_widths[4]
-        pdf.set_xy(x, y)
-
-        # Kredit (angka single line)
-        pdf.rect(x, y, col_widths[5], row_height)
-        pdf.cell(col_widths[5], row_height, values[5], border=0, align="R")
-
-        pdf.set_y(y + row_height)
+        # gambar kotak tiap kolom
+        x_start = pdf.get_x()
+        y_start = pdf.get_y()
+        for i, (val, w) in enumerate(zip(values, col_widths)):
+            pdf.rect(x_start, y_start, w, row_height)   # kotak
+            pdf.set_xy(x_start, y_start)
+            align = "R" if i in [4,5] else "L"
+            pdf.multi_cell(w, 6, val, align=align)      # isi text
+            x_start += w
+        pdf.set_y(y_start + row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
