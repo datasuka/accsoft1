@@ -23,7 +23,6 @@ def buat_voucher(df, voucher_no, settings):
     if data.empty:
         return None
 
-    tanggal = pd.to_datetime(data.iloc[0]["Tanggal"]).strftime("%d/%m/%Y")
     total_debit = data["Debet"].fillna(0).sum()
     total_kredit = data["Kredit"].fillna(0).sum()
 
@@ -64,9 +63,10 @@ def buat_voucher(df, voucher_no, settings):
     # Isi tabel
     pdf.set_font("Arial", "", 9)
     for _, row in data.iterrows():
-        pdf.cell(col_widths[0], 8, pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y"), border=1)
+        tanggal = pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y")
+        pdf.cell(col_widths[0], 8, tanggal, border=1)
         pdf.cell(col_widths[1], 8, str(row["No Akun"]), border=1)
-        pdf.cell(col_widths[2], 8, str(row["Akun"])[:30], border=1)  # wrap bisa ditambah
+        pdf.cell(col_widths[2], 8, str(row["Akun"])[:30], border=1)
         pdf.cell(col_widths[3], 8, str(row["Deskripsi"])[:30], border=1)
         pdf.cell(col_widths[4], 8, format_rupiah(row["Debet"]), border=1, align="R")
         pdf.cell(col_widths[5], 8, format_rupiah(row["Kredit"]), border=1, align="R")
@@ -93,12 +93,16 @@ def buat_voucher(df, voucher_no, settings):
     pdf.cell(95, 6, f"({settings.get('direktur','')})", align="C")
     pdf.cell(95, 6, f"({settings.get('finance','')})", align="C")
 
-    return pdf.output(dest="S").encode("latin-1")
+    # ✅ fix output (support fpdf / fpdf2)
+    pdf_bytes = pdf.output(dest="S")
+    if isinstance(pdf_bytes, str):  
+        pdf_bytes = pdf_bytes.encode("latin-1")
+    return pdf_bytes
 
 # ===== App Utama =====
 st.title("📑 Mini Akunting - Voucher Jurnal")
 
-# Upload
+# Upload file
 file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx", "xls"])
 if file:
     df = pd.read_excel(file)
@@ -119,7 +123,7 @@ if file:
         "logo": logo,
     }
 
-    # Pilihan single/multi
+    # Pilihan mode download
     mode = st.radio("Pilih Mode Download", ["Single", "Multi"], horizontal=True)
 
     if mode == "Single":
