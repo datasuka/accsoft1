@@ -4,6 +4,7 @@ from fpdf import FPDF
 from num2words import num2words
 from PIL import Image
 import io
+import math
 
 # --- Fungsi Terbilang Indonesia ---
 def terbilang(nominal):
@@ -88,12 +89,10 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     # Tabel Header
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(25, 8, "Tanggal", 1)
-    pdf.cell(25, 8, "Akun", 1)
-    pdf.cell(50, 8, "Nama Akun", 1)
-    pdf.cell(40, 8, "Deskripsi", 1)
-    pdf.cell(25, 8, "Debit", 1, align="R")
-    pdf.cell(25, 8, "Kredit", 1, align="R")
+    col_widths = [25, 25, 50, 40, 25, 25]
+    headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debit", "Kredit"]
+    for i, h in enumerate(headers):
+        pdf.cell(col_widths[i], 8, h, 1, align="C")
     pdf.ln()
 
     total_debit = 0
@@ -104,48 +103,40 @@ def buat_voucher(jurnal_df, no_voucher, settings):
         debit_val = int(row.get("debit", 0)) if pd.notna(row.get("debit", 0)) else 0
         kredit_val = int(row.get("kredit", 0)) if pd.notna(row.get("kredit", 0)) else 0
 
-        # hitung tinggi baris berdasarkan deskripsi
-        y_before = pdf.get_y()
-        x_before = pdf.get_x()
+        col_values = [
+            str(row.get('tanggal', '')),
+            str(row.get('no akun', '')),
+            str(row.get('akun', '')),
+            str(row.get('deskripsi', '')),
+            f"{debit_val:,}".replace(",", "."),
+            f"{kredit_val:,}".replace(",", ".")
+        ]
 
-        # Tanggal
-        pdf.multi_cell(25, 8, str(row.get('tanggal', '')), border=1)
-        y_after = pdf.get_y()
-        row_height = y_after - y_before
-        pdf.set_xy(x_before + 25, y_before)
+        # --- Hitung tinggi baris maksimum ---
+        line_heights = []
+        for i, val in enumerate(col_values):
+            # approx jumlah baris berdasarkan panjang teks & lebar kolom
+            n_lines = math.ceil(pdf.get_string_width(val) / (col_widths[i] - 2)) if val else 1
+            line_heights.append(n_lines * 6)
+        row_height = max(line_heights)
 
-        # No Akun
-        pdf.multi_cell(25, row_height, str(row.get('no akun', '')), border=1)
-        pdf.set_xy(x_before + 25 + 25, y_before)
-
-        # Nama Akun
-        pdf.multi_cell(50, row_height, str(row.get('akun', '')), border=1)
-        pdf.set_xy(x_before + 25 + 25 + 50, y_before)
-
-        # Deskripsi (wrap text)
-        pdf.multi_cell(40, 8, str(row.get('deskripsi', '')), border=1)
-        y_tmp = pdf.get_y()
-        row_height = max(row_height, y_tmp - y_before)
-        pdf.set_xy(x_before + 25 + 25 + 50 + 40, y_before)
-
-        # Debit
-        pdf.multi_cell(25, row_height, f"{debit_val:,}".replace(",", "."), border=1, align="R")
-        pdf.set_xy(x_before + 25 + 25 + 50 + 40 + 25, y_before)
-
-        # Kredit
-        pdf.multi_cell(25, row_height, f"{kredit_val:,}".replace(",", "."), border=1, align="R")
-
-        # Set Y ke bawah baris berikutnya
-        pdf.set_y(y_before + row_height)
+        # --- Render baris ---
+        x = pdf.get_x()
+        y = pdf.get_y()
+        for i, val in enumerate(col_values):
+            pdf.multi_cell(col_widths[i], 6, val, border=1, align="L")
+            pdf.set_xy(x + col_widths[i], y)
+            x += col_widths[i]
+        pdf.set_y(y + row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
 
     # Total
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(140, 8, "Total", 1)
-    pdf.cell(25, 8, f"{total_debit:,}".replace(",", "."), 1, align="R")
-    pdf.cell(25, 8, f"{total_kredit:,}".replace(",", "."), 1, align="R")
+    pdf.cell(sum(col_widths[:-2]), 8, "Total", 1)
+    pdf.cell(col_widths[-2], 8, f"{total_debit:,}".replace(",", "."), 1, align="R")
+    pdf.cell(col_widths[-1], 8, f"{total_kredit:,}".replace(",", "."), 1, align="R")
     pdf.ln()
 
     # Tentukan nilai terbilang
@@ -189,7 +180,7 @@ uploaded_file = st.file_uploader("Upload Daftar Jurnal (Excel/CSV)", type=["xlsx
 
 if uploaded_file:
     if uploaded_file.name.endswith("csv"):
-        df = pd.read_csv(uploaded_file, dtype=str)  # baca semua sebagai string biar aman
+        df = pd.read_csv(uploaded_file, dtype=str)
     else:
         df = pd.read_excel(uploaded_file, dtype=str)
 
