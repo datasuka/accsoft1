@@ -76,8 +76,10 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(40, 8, f"{total_kredit:,}", 1, align="R")
     pdf.ln()
 
+    # Tentukan nilai terbilang (pakai sisi yang ada nilainya)
+    nilai_terbilang = total_debit if total_debit != 0 else total_kredit
     pdf.set_font("Arial", 'I', 9)
-    pdf.multi_cell(0, 6, f"Terbilang: {terbilang(int(total_debit))} rupiah")
+    pdf.multi_cell(0, 6, f"Terbilang: {terbilang(int(nilai_terbilang))} rupiah")
 
     pdf.ln(15)
     pdf.set_font("Arial", '', 10)
@@ -129,7 +131,7 @@ if uploaded_file:
         if col in df.columns:
             df[col] = (
                 df[col]
-                .astype(str)  # pastikan string
+                .astype(str)
                 .str.replace(r"[^\d\-]", "", regex=True)  # hapus semua non-digit kecuali minus
                 .replace("", "0")
                 .astype(int)
