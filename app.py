@@ -54,7 +54,7 @@ def buat_voucher(df, no_voucher, settings):
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
     # table header
-    col_widths = [28, 20, 80, 25, 25]  # Deskripsi dihapus dari tabel utama
+    col_widths = [28, 20, 80, 25, 25]  # Deskripsi dipisah
     headers = ["Tanggal","Akun","Nama Akun","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
@@ -117,15 +117,18 @@ def buat_voucher(df, no_voucher, settings):
     pdf.cell(col_widths[4],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
 
+    # lebar halaman efektif
+    page_width = pdf.w - pdf.l_margin - pdf.r_margin
+
     # terbilang setelah total
     pdf.set_font("Arial","I",9)
-    pdf.multi_cell(0,6,f"Terbilang: {num2words(total_debit, lang='id')} rupiah")
+    pdf.multi_cell(page_width,6,f"Terbilang: {num2words(total_debit, lang='id')} rupiah", align="L")
 
     # deskripsi (ambil 1 dari baris pertama)
     first_desc = str(data.iloc[0]["Deskripsi"]) if not data.empty else ""
     if first_desc.strip():
         pdf.set_font("Arial","",9)
-        pdf.multi_cell(0,6,f"Deskripsi : {first_desc}")
+        pdf.multi_cell(page_width,6,f"Deskripsi : {first_desc}", align="L")
 
     # tanda tangan
     pdf.ln(15)
