@@ -12,6 +12,38 @@ def terbilang(nominal):
     except:
         return str(nominal)
 
+# --- Fungsi bersihkan data jurnal ---
+def bersihkan_jurnal(df):
+    # Hapus kolom Unnamed
+    df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
+
+    # Normalisasi nama kolom
+    df.columns = df.columns.str.strip().str.lower()
+
+    # Ganti alias nama kolom
+    rename_map = {
+        "debet": "debit",
+        "no": "nomor voucher jurnal",
+        "no akun": "no akun"
+    }
+    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+
+    # Hapus baris kosong / header duplikat
+    df = df.dropna(how="all")
+    df = df[df["akun"] != "akun"] if "akun" in df.columns else df
+
+    # Bersihkan angka debit/kredit
+    for col in ["debit", "kredit"]:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace(r"[^\d\-]", "", regex=True)
+                .replace("", "0")
+                .astype(int)
+            )
+    return df
+
 # --- Fungsi Generate Voucher ---
 def buat_voucher(jurnal_df, no_voucher, settings):
     data = jurnal_df[jurnal_df['nomor voucher jurnal'] == no_voucher]
@@ -41,7 +73,6 @@ def buat_voucher(jurnal_df, no_voucher, settings):
 
     pdf.set_font("Arial", '', 11)
     pdf.cell(200, 8, f"No Voucher : {no_voucher}", ln=True, align="C")
-
     pdf.ln(5)
 
     # Tabel Jurnal
@@ -76,7 +107,7 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(40, 8, f"{total_kredit:,}", 1, align="R")
     pdf.ln()
 
-    # Tentukan nilai terbilang (pakai sisi yang ada nilainya)
+    # Tentukan nilai terbilang
     nilai_terbilang = total_debit if total_debit != 0 else total_kredit
     pdf.set_font("Arial", 'I', 9)
     pdf.multi_cell(0, 6, f"Terbilang: {terbilang(int(nilai_terbilang))} rupiah")
@@ -90,11 +121,9 @@ def buat_voucher(jurnal_df, no_voucher, settings):
     pdf.cell(100, 6, settings.get("direktur", ""), align="C")
     pdf.cell(90, 6, settings.get("finance", ""), align="C")
 
-    # Simpan ke memori (bukan file fisik)
     buf = io.BytesIO()
     pdf.output(buf)
-    pdf_data = buf.getvalue()
-    return pdf_data
+    return buf.getvalue()
 
 # --- STREAMLIT APP ---
 st.title("📄 Cetak Voucher Jurnal")
@@ -123,19 +152,8 @@ if uploaded_file:
     else:
         df = pd.read_excel(uploaded_file)
 
-    # Normalisasi kolom
-    df.columns = df.columns.str.strip().str.lower()
-
-    # Bersihkan angka di kolom debit/kredit
-    for col in ["debit", "kredit"]:
-        if col in df.columns:
-            df[col] = (
-                df[col]
-                .astype(str)
-                .str.replace(r"[^\d\-]", "", regex=True)  # hapus semua non-digit kecuali minus
-                .replace("", "0")
-                .astype(int)
-            )
+    # Bersihkan data
+    df = bersihkan_jurnal(df)
 
     # Preview
     st.subheader("Preview Data Jurnal")
