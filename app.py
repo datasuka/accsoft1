@@ -53,8 +53,8 @@ def buat_voucher(df, no_voucher, settings):
     # ambil data voucher
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
-    # table header (tanpa deskripsi)
-    col_widths = [30, 25, 80, 25, 25]
+    # table header (tanpa Deskripsi)
+    col_widths = [35, 25, 75, 25, 25]
     headers = ["Tanggal","Akun","Nama Akun","Debit","Kredit"]
 
     pdf.set_font("Arial","B",9)
@@ -85,7 +85,7 @@ def buat_voucher(df, no_voucher, settings):
         # hitung tinggi baris
         line_counts = []
         for i, (val, w) in enumerate(zip(values, col_widths)):
-            if i in [3, 4]:
+            if i in [3,4]:
                 line_counts.append(1)
             else:
                 lines = pdf.multi_cell(w, 6, val, split_only=True)
@@ -97,12 +97,13 @@ def buat_voucher(df, no_voucher, settings):
         x_start = pdf.get_x()
         y_start = pdf.get_y()
         for i, (val, w) in enumerate(zip(values, col_widths)):
-            pdf.rect(x_start, y_start, w, row_height)   # kotak
+            pdf.rect(x_start, y_start, w, row_height)
             pdf.set_xy(x_start, y_start)
+            align = "R" if i in [3,4] else "L"
             if i in [3,4]:
-                pdf.cell(w, row_height, val, align="R")
+                pdf.cell(w, row_height, val, align=align)
             else:
-                pdf.multi_cell(w, 6, val, align="L")
+                pdf.multi_cell(w, 6, val, align=align)
             x_start += w
         pdf.set_y(y_start + row_height)
 
@@ -121,21 +122,21 @@ def buat_voucher(df, no_voucher, settings):
     # baris terbilang
     pdf.set_font("Arial","I",9)
     terbilang_text = f"Terbilang : {num2words(total_debit, lang='id')} rupiah"
-    pdf.multi_cell(page_width, 8, terbilang_text, border=1, align="L")
+    pdf.multi_cell(page_width,8,terbilang_text,border=1,align="L")
 
-    # baris deskripsi (ambil yang pertama saja)
+    # baris deskripsi
     first_desc = str(data.iloc[0]["Deskripsi"]) if not data.empty else ""
     pdf.set_font("Arial","",9)
-    pdf.multi_cell(page_width, 8, f"Deskripsi : {first_desc}", border=1, align="L")
+    pdf.multi_cell(page_width,8,f"Deskripsi : {first_desc}",border=1,align="L")
 
     # tanda tangan
     pdf.ln(15)
     pdf.set_font("Arial","",10)
-    pdf.cell(page_width/2,6,"Direktur,",align="C")
-    pdf.cell(page_width/2,6,"Finance,",align="C",ln=1)
+    pdf.cell(90,6,"Direktur,",align="C")
+    pdf.cell(90,6,"Finance,",align="C",ln=1)
     pdf.ln(20)
-    pdf.cell(page_width/2,6,f"({settings.get('direktur','')})",align="C")
-    pdf.cell(page_width/2,6,f"({settings.get('finance','')})",align="C",ln=1)
+    pdf.cell(90,6,f"({settings.get('direktur','')})",align="C")
+    pdf.cell(90,6,f"({settings.get('finance','')})",align="C",ln=1)
 
     buffer = BytesIO()
     pdf.output(buffer)
