@@ -54,7 +54,7 @@ def buat_voucher(df, voucher_no, settings):
 
     # Tabel header
     pdf.set_font("Arial", "B", 9)
-    col_widths = [25, 20, 55, 40, 25, 25]  # biar deskripsi fleksibel
+    col_widths = [25, 20, 55, 40, 25, 25]
     headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debit", "Kredit"]
     for h, w in zip(headers, col_widths):
         pdf.cell(w, 8, h, border=1, align="C")
@@ -93,10 +93,12 @@ def buat_voucher(df, voucher_no, settings):
     pdf.cell(95, 6, f"({settings.get('direktur','')})", align="C")
     pdf.cell(95, 6, f"({settings.get('finance','')})", align="C")
 
-    # ✅ fix output (support fpdf / fpdf2)
+    # ✅ fix output (selalu bytes)
     pdf_bytes = pdf.output(dest="S")
-    if isinstance(pdf_bytes, str):  
+    if isinstance(pdf_bytes, str):
         pdf_bytes = pdf_bytes.encode("latin-1")
+    elif isinstance(pdf_bytes, bytearray):
+        pdf_bytes = bytes(pdf_bytes)
     return pdf_bytes
 
 # ===== App Utama =====
