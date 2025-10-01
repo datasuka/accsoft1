@@ -3,9 +3,12 @@ import pandas as pd
 from fpdf import FPDF
 from io import BytesIO
 from num2words import num2words
-import zipfile
 import calendar
-from datetime import datetime
+
+# --- helper untuk wrapping ---
+def wrap_text(pdf, text, col_width):
+    lines = pdf.multi_cell(col_width, 6, text, split_only=True)
+    return lines
 
 # --- bersihkan data ---
 def bersihkan_jurnal(df):
@@ -28,11 +31,10 @@ def bersihkan_jurnal(df):
 def buat_voucher(df, no_voucher, settings):
     pdf = FPDF("P", "mm", "A4")
     pdf.add_page()
-    pdf.set_font("Arial", "B", 12)
 
-    # Header perusahaan
+    # ===== HEADER =====
     if settings.get("logo"):
-        pdf.image(settings["logo"], 10, 8, settings.get("logo_size", 25))
+        pdf.image(settings["logo"], 15, 10, h=20)  # sejajar dengan header
 
     pdf.set_xy(0, 10)
     pdf.set_font("Arial", "B", 12)
@@ -49,20 +51,20 @@ def buat_voucher(df, no_voucher, settings):
     pdf.cell(0, 8, f"No Voucher : {no_voucher}", ln=1, align="C")
     pdf.ln(4)
 
-    # ambil data voucher
+    # ===== DATA VOUCHER =====
     data = df[df["Nomor Voucher Jurnal"] == no_voucher]
 
-    # table header
-    col_widths = [25, 20, 50, 55, 25, 25]
+    col_widths = [25, 20, 50, 55, 20, 20]
     headers = ["Tanggal","Akun","Nama Akun","Deskripsi","Debit","Kredit"]
 
+    # Header tabel
     pdf.set_font("Arial","B",9)
     for h,w in zip(headers,col_widths):
         pdf.cell(w, 8, h, border=1, align="C")
     pdf.ln()
 
-    total_debit, total_kredit = 0,0
     pdf.set_font("Arial","",9)
+    total_debit, total_kredit = 0,0
 
     for _, row in data.iterrows():
         debit_val = int(row["Debet"]) if pd.notna(row["Debet"]) else 0
@@ -82,40 +84,56 @@ def buat_voucher(df, no_voucher, settings):
             f"{kredit_val:,}".replace(",", ".")
         ]
 
-        # hitung tinggi baris (line count max)
-        line_counts = []
-        for val, w in zip(values, col_widths):
-            lines = pdf.multi_cell(w, 6, val, split_only=True)
-            line_counts.append(len(lines))
-        max_lines = max(line_counts)
+        # cek jumlah baris tiap kolom (wrap)
+        nama_lines = wrap_text(pdf, values[2], col_widths[2])
+        desc_lines = wrap_text(pdf, values[3], col_widths[3])
+        max_lines = max(len(nama_lines), len(desc_lines), 1)
         row_height = max_lines * 6
 
-        # gambar kotak tiap kolom
-        x_start = pdf.get_x()
-        y_start = pdf.get_y()
-        for i, (val, w) in enumerate(zip(values, col_widths)):
-            pdf.rect(x_start, y_start, w, row_height)   # kotak
-            pdf.set_xy(x_start, y_start)
-            align = "R" if i in [4,5] else "L"
-            pdf.multi_cell(w, 6, val, align=align)      # isi text
-            x_start += w
-        pdf.set_y(y_start + row_height)
+        # simpan posisi awal
+        x = pdf.get_x()
+        y = pdf.get_y()
+
+        # Tanggal
+        pdf.multi_cell(col_widths[0], row_height, values[0], border=1, align="L")
+        pdf.set_xy(x+col_widths[0], y)
+
+        # No Akun
+        pdf.multi_cell(col_widths[1], row_height, values[1], border=1, align="L")
+        pdf.set_xy(x+col_widths[0]+col_widths[1], y)
+
+        # Nama Akun
+        pdf.multi_cell(col_widths[2], 6, values[2], border=1, align="L")
+        pdf.set_xy(x+col_widths[0]+col_widths[1]+col_widths[2], y)
+
+        # Deskripsi
+        pdf.multi_cell(col_widths[3], 6, values[3], border=1, align="L")
+        pdf.set_xy(x+col_widths[0]+col_widths[1]+col_widths[2]+col_widths[3], y)
+
+        # Debit
+        pdf.multi_cell(col_widths[4], row_height, values[4], border=1, align="R")
+        pdf.set_xy(x+sum(col_widths[:-1]), y)
+
+        # Kredit
+        pdf.multi_cell(col_widths[5], row_height, values[5], border=1, align="R")
+
+        pdf.ln(row_height)
 
         total_debit += debit_val
         total_kredit += kredit_val
 
-    # total row
+    # Total
     pdf.set_font("Arial","B",9)
     pdf.cell(sum(col_widths[:-2]),8,"Total",border=1,align="R")
     pdf.cell(col_widths[4],8,f"{total_debit:,}".replace(",", "."),border=1,align="R")
     pdf.cell(col_widths[5],8,f"{total_kredit:,}".replace(",", "."),border=1,align="R")
     pdf.ln()
 
-    # terbilang
+    # Terbilang
     pdf.set_font("Arial","I",9)
     pdf.multi_cell(0,6,f"Terbilang: {num2words(total_debit, lang='id')} rupiah")
 
-    # tanda tangan
+    # Tanda tangan
     pdf.ln(15)
     pdf.set_font("Arial","",10)
     pdf.cell(95,6,"Direktur,",align="C")
@@ -128,7 +146,7 @@ def buat_voucher(df, no_voucher, settings):
     pdf.output(buffer)
     return buffer
 
-# --- Streamlit ---
+# ========== STREAMLIT ==========
 st.set_page_config(page_title="Mini Akunting", layout="wide")
 st.title("📑 Mini Akunting - Voucher Jurnal")
 
@@ -145,31 +163,31 @@ if logo_file:
     tmp = BytesIO(logo_file.read())
     settings["logo"] = tmp
 
-# Main content
+# Upload file
 file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx","xls"])
 if file:
     df = pd.read_excel(file)
     df = bersihkan_jurnal(df)
     st.dataframe(df.head())
 
-    mode = st.radio("Pilih Mode Cetak", ["Single Voucher", "Per Bulan"])
+    mode = st.radio("Pilih Mode Download", ["Single Voucher","Multi Voucher per Bulan"])
 
     if mode == "Single Voucher":
         no_voucher = st.selectbox("Pilih Nomor Voucher", df["Nomor Voucher Jurnal"].unique())
-        if st.button("Cetak Voucher Jurnal"):
+        if st.button("Download Voucher Jurnal"):
             pdf_file = buat_voucher(df, no_voucher, settings)
             st.download_button("⬇️ Download PDF", data=pdf_file, file_name=f"{no_voucher}.pdf")
 
-    else:  # per bulan
+    else:
         df["Tanggal"] = pd.to_datetime(df["Tanggal"], errors="coerce")
-        df = df.dropna(subset=["Tanggal"])
-        bulan = st.selectbox("Pilih Bulan", range(1,13), format_func=lambda x: calendar.month_name[x])
+        bulan_list = sorted(df["Tanggal"].dt.month.dropna().unique())
+        bulan_map = {i: calendar.month_name[i] for i in bulan_list}
+        bulan_pilih = st.selectbox("Pilih Bulan", bulan_list, format_func=lambda x: bulan_map[x])
 
-        if st.button("Cetak Semua Voucher Bulan Ini"):
-            buffer_zip = BytesIO()
-            with zipfile.ZipFile(buffer_zip, "w") as zf:
-                for v in df[df["Tanggal"].dt.month==bulan]["Nomor Voucher Jurnal"].unique():
-                    pdf_file = buat_voucher(df, v, settings)
-                    zf.writestr(f"{v}.pdf", pdf_file.getvalue())
-            buffer_zip.seek(0)
-            st.download_button("⬇️ Download ZIP", data=buffer_zip, file_name=f"voucher_{bulan}.zip", mime="application/zip")
+        if st.button("Download Semua Voucher Bulan"):
+            buffer_all = BytesIO()
+            for v in df[df["Tanggal"].dt.month == bulan_pilih]["Nomor Voucher Jurnal"].unique():
+                pdf_v = buat_voucher(df, v, settings)
+                buffer_all.write(pdf_v.getbuffer())
+            buffer_all.seek(0)
+            st.download_button("⬇️ Download PDF Bulanan", data=buffer_all, file_name=f"Voucher_{bulan_map[bulan_pilih]}.pdf")
