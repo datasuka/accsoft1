@@ -11,6 +11,19 @@ def terbilang(nominal):
     except:
         return str(nominal)
 
+# --- Fungsi untuk bikin nama kolom unik ---
+def make_unique(columns):
+    seen = {}
+    new_cols = []
+    for col in columns:
+        if col not in seen:
+            seen[col] = 0
+            new_cols.append(col)
+        else:
+            seen[col] += 1
+            new_cols.append(f"{col}.{seen[col]}")
+    return new_cols
+
 # --- Fungsi Generate Voucher ---
 def buat_voucher(jurnal_df, no_jurnal, settings):
     data = jurnal_df[jurnal_df['no jurnal'] == no_jurnal]
@@ -124,10 +137,7 @@ if uploaded_file:
 
     # --- Normalisasi kolom ---
     df.columns = df.columns.str.strip().str.lower()
-
-    # Buat nama kolom unik otomatis (jika ada duplikat)
-    from pandas.io.parsers.base_parser import ParserBase
-    df.columns = ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
+    df.columns = make_unique(df.columns)  # pastikan unik
 
     # Alias umum
     if "debet" in df.columns and "debit" not in df.columns:
