@@ -118,11 +118,12 @@ def buat_voucher(df, no_voucher, settings):
     first_desc = str(data.iloc[0]["Deskripsi"]) if not data.empty else ""
     if first_desc.strip():
         pdf.set_font("Arial","",9)
-        pdf.multi_cell(0,6,f"Deskripsi : {first_desc}", border=1)
+        pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, f"Deskripsi : {first_desc}", border=1)
 
-    # terbilang
+    # terbilang (pakai width fix biar aman)
     pdf.set_font("Arial","I",9)
-    pdf.multi_cell(0,6,f"Terbilang: {num2words(total_debit, lang='id')} rupiah")
+    terbilang_text = f"Terbilang: {num2words(total_debit, lang='id')} rupiah"
+    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 6, terbilang_text)
 
     # tanda tangan
     pdf.ln(15)
