@@ -1,223 +1,202 @@
 import streamlit as st
 import pandas as pd
-from io import BytesIO
 from fpdf import FPDF
 from num2words import num2words
+import base64
+from io import BytesIO
+from datetime import datetime
 
-# =========================
-# Fungsi bersih-bersih data
-# =========================
-def bersihkan_jurnal(df):
-    df.columns = [c.strip() for c in df.columns]
-    df["Tanggal"] = pd.to_datetime(df["Tanggal"], errors="coerce").dt.strftime("%d/%m/%Y")
-    df["Debet"] = pd.to_numeric(df["Debet"], errors="coerce").fillna(0)
-    df["Kredit"] = pd.to_numeric(df["Kredit"], errors="coerce").fillna(0)
-    return df
+# ==============================
+# Fungsi format angka
+# ==============================
+def format_rupiah(x):
+    try:
+        return f"{int(x):,}".replace(",", ".")
+    except:
+        return "0"
 
-# =========================
-# Fungsi cetak PDF voucher
-# =========================
-def buat_voucher(df, no_voucher, settings):
-    group = df[df["Nomor Voucher Jurnal"] == no_voucher]
+# ==============================
+# Fungsi konversi ke terbilang
+# ==============================
+def terbilang_rupiah(x):
+    try:
+        return num2words(int(x), lang='id') + " rupiah"
+    except:
+        return "nol rupiah"
 
-    pdf = FPDF("P", "mm", "A4")
+# ==============================
+# Fungsi buat voucher ke PDF
+# ==============================
+def buat_voucher(df, voucher_no, perusahaan, alamat, direktur, finance, logo=None):
+    buffer = BytesIO()
+    pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 12)
 
-    # Logo
-    if settings.get("logo") is not None:
-        pdf.image(settings["logo"], 10, 8, 25)
+    # Header dengan logo
+    if logo:
+        pdf.image(logo, 10, 8, 25)
+        pdf.set_xy(40, 10)
+    else:
+        pdf.set_xy(10, 10)
 
-    # Nama perusahaan & alamat
-    pdf.cell(200, 10, settings.get("perusahaan",""), ln=1, align="C")
+    pdf.multi_cell(0, 8, perusahaan, align="L")
     pdf.set_font("Arial", "", 10)
-    pdf.multi_cell(200, 5, settings.get("alamat",""), align="C")
-    pdf.ln(3)
-
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(200, 8, "BUKTI VOUCHER JURNAL", ln=1, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(200, 7, f"No Voucher : {no_voucher}", ln=1, align="C")
+    pdf.multi_cell(0, 6, alamat, align="L")
     pdf.ln(4)
 
-    # Lebar kolom sinkron preview
-    col_widths = [25, 20, 55, 50, 20, 20]
-    headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debet", "Kredit"]
+    # Judul
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "BUKTI VOUCHER JURNAL", align="C", ln=True)
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(0, 8, f"No Voucher : {voucher_no}", align="C", ln=True)
+    pdf.ln(4)
 
+    # Table Header
     pdf.set_font("Arial", "B", 9)
+    col_widths = [25, 20, 55, 50, 20, 20]
+    headers = ["Tanggal", "Akun", "Nama Akun", "Deskripsi", "Debit", "Kredit"]
+
     for i, h in enumerate(headers):
-        pdf.cell(col_widths[i], 8, h, 1, 0, "C")
+        pdf.cell(col_widths[i], 8, h, border=1, align="C")
     pdf.ln()
 
+    # Isi tabel
     pdf.set_font("Arial", "", 9)
-    for _, row in group.iterrows():
-        pdf.cell(col_widths[0], 8, str(row["Tanggal"]), 1)
-        pdf.cell(col_widths[1], 8, str(row["No Akun"]), 1)
-        pdf.cell(col_widths[2], 8, str(row["Akun"])[:30], 1)
-        pdf.cell(col_widths[3], 8, str(row["Deskripsi"])[:30], 1)
-        pdf.cell(col_widths[4], 8, f"{row['Debet']:,.0f}", 1, 0, "R")
-        pdf.cell(col_widths[5], 8, f"{row['Kredit']:,.0f}", 1, 0, "R")
+    total_debit, total_kredit = 0, 0
+
+    for _, row in df.iterrows():
+        tanggal = pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y")
+        akun = str(row["No Akun"])
+        nama = str(row["Akun"])
+        desk = str(row["Deskripsi"])
+        debit = row["Debet"] if not pd.isna(row["Debet"]) else 0
+        kredit = row["Kredit"] if not pd.isna(row["Kredit"]) else 0
+
+        total_debit += debit
+        total_kredit += kredit
+
+        # Tulis baris
+        pdf.cell(col_widths[0], 8, tanggal, border=1)
+        pdf.cell(col_widths[1], 8, akun, border=1)
+        pdf.multi_cell(col_widths[2], 8, nama, border=1)
+        x = pdf.get_x()
+        y = pdf.get_y()
+        pdf.set_xy(x + col_widths[2], y - 8)
+        pdf.multi_cell(col_widths[3], 8, desk, border=1)
+        pdf.set_xy(x + col_widths[2] + col_widths[3], y)
+        pdf.cell(col_widths[4], 8, format_rupiah(debit), border=1, align="R")
+        pdf.cell(col_widths[5], 8, format_rupiah(kredit), border=1, align="R")
         pdf.ln()
 
     # Total
-    total_debit = group["Debet"].sum()
-    total_kredit = group["Kredit"].sum()
     pdf.set_font("Arial", "B", 9)
-    pdf.cell(sum(col_widths[:-2]), 8, "Total", 1)
-    pdf.cell(col_widths[4], 8, f"{total_debit:,.0f}", 1, 0, "R")
-    pdf.cell(col_widths[5], 8, f"{total_kredit:,.0f}", 1, 0, "R")
-    pdf.ln(12)
+    pdf.cell(sum(col_widths[:-2]), 8, "Total", border=1)
+    pdf.cell(col_widths[4], 8, format_rupiah(total_debit), border=1, align="R")
+    pdf.cell(col_widths[5], 8, format_rupiah(total_kredit), border=1, align="R")
+    pdf.ln()
 
     # Terbilang
-    pdf.set_font("Arial", "I", 9)
-    pdf.multi_cell(200, 5, f"Terbilang: {num2words(int(total_debit), lang='id')} rupiah")
+    pdf.set_font("Arial", "I", 8)
+    pdf.multi_cell(0, 6, f"Terbilang: {terbilang_rupiah(total_debit)}", align="L")
+    pdf.ln(10)
 
     # Tanda tangan
-    pdf.ln(20)
     pdf.set_font("Arial", "", 10)
-    pdf.cell(100, 5, "Direktur,", 0, 0, "C")
-    pdf.cell(100, 5, "Finance,", 0, 1, "C")
-    pdf.ln(20)
-    pdf.cell(100, 5, f"({settings.get('direktur','')})", 0, 0, "C")
-    pdf.cell(100, 5, f"({settings.get('finance','')})", 0, 1, "C")
+    pdf.cell(90, 6, "Direktur,", align="C")
+    pdf.cell(90, 6, "Finance,", align="C", ln=True)
+    pdf.ln(15)
+    pdf.cell(90, 6, f"({direktur})", align="C")
+    pdf.cell(90, 6, f"({finance})", align="C", ln=True)
 
-    out = BytesIO()
-    pdf.output(out)
-    return out.getvalue()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
 
-# =========================
-# Streamlit UI
-# =========================
-st.title("🧾 Mini Akunting - Voucher Jurnal")
+# ==============================
+# Fungsi Preview HTML Voucher
+# ==============================
+def preview_voucher(df, voucher_no, perusahaan, alamat, direktur, finance, logo=None):
+    total_debit = df["Debet"].fillna(0).sum()
+    total_kredit = df["Kredit"].fillna(0).sum()
 
-file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx", "xls"])
-
-# Form pengaturan perusahaan
-with st.form("settings_form"):
-    st.subheader("⚙️ Pengaturan Perusahaan")
-    perusahaan = st.text_input("Nama Perusahaan")
-    alamat = st.text_area("Alamat Perusahaan")
-    direktur = st.text_input("Nama Direktur")
-    finance = st.text_input("Nama Finance")
-    logo = st.file_uploader("Upload Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
-    submitted = st.form_submit_button("Simpan Pengaturan")
-
-settings = {
-    "perusahaan": perusahaan,
-    "alamat": alamat,
-    "direktur": direktur,
-    "finance": finance,
-    "logo": logo if logo else None
-}
-
-if file:
-    df = pd.read_excel(file)
-    df = bersihkan_jurnal(df)
-
-    no_voucher = st.selectbox("Pilih Nomor Voucher", df["Nomor Voucher Jurnal"].unique())
-
-    if no_voucher:
-        group = df[df["Nomor Voucher Jurnal"] == no_voucher]
-
-        # =========================
-        # PRINT PREVIEW VOUCHER
-        # =========================
-        st.subheader("🖨️ Print Preview Voucher")
-
-        st.markdown("""
-        <style>
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 13px;
-            }
-            th, td {
-                border: 1px solid black;
-                padding: 6px;
-                vertical-align: top;
-                text-align: left;
-                word-wrap: break-word;
-                white-space: pre-wrap;
-            }
-            th {
-                background-color: #f2f2f2;
-                text-align: center;
-            }
-            td:nth-child(5), td:nth-child(6) {
-                text-align: right;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # Generate HTML preview
-        html = f"""
-        <div style="text-align:center;">
-            <h3>{settings.get('perusahaan','')}</h3>
-            <p>{settings.get('alamat','')}</p>
-            <h4>BUKTI VOUCHER JURNAL</h4>
-            <p>No Voucher : {no_voucher}</p>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th style="width:12%;">Tanggal</th>
-                    <th style="width:10%;">Akun</th>
-                    <th style="width:25%;">Nama Akun</th>
-                    <th style="width:28%;">Deskripsi</th>
-                    <th style="width:12%;">Debet</th>
-                    <th style="width:13%;">Kredit</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-
-        for _, row in group.iterrows():
-            html += f"""
-            <tr>
-                <td>{row['Tanggal']}</td>
-                <td>{row['No Akun']}</td>
-                <td>{row['Akun']}</td>
-                <td>{row['Deskripsi']}</td>
-                <td>{row['Debet']:,.0f}</td>
-                <td>{row['Kredit']:,.0f}</td>
-            </tr>
-            """
-
-        total_debit = group["Debet"].sum()
-        total_kredit = group["Kredit"].sum()
+    html = f"""
+    <div style='text-align:center'>
+        {'<img src="data:image/png;base64,'+base64.b64encode(open(logo, "rb").read()).decode()+"\" width='50' />" if logo else ""}
+        <h3>{perusahaan}</h3>
+        <p>{alamat}</p>
+        <h4>BUKTI VOUCHER JURNAL</h4>
+        <p><b>No Voucher:</b> {voucher_no}</p>
+    </div>
+    <table border='1' cellspacing='0' cellpadding='5' width='100%'>
+        <tr style='background:#eee; text-align:center'>
+            <th>Tanggal</th><th>Akun</th><th>Nama Akun</th><th>Deskripsi</th><th>Debit</th><th>Kredit</th>
+        </tr>
+    """
+    for _, row in df.iterrows():
+        tanggal = pd.to_datetime(row["Tanggal"]).strftime("%d/%m/%Y")
+        akun = str(row["No Akun"])
+        nama = str(row["Akun"])
+        desk = str(row["Deskripsi"])
+        debit = format_rupiah(row["Debet"]) if not pd.isna(row["Debet"]) else "0"
+        kredit = format_rupiah(row["Kredit"]) if not pd.isna(row["Kredit"]) else "0"
 
         html += f"""
-            <tr>
-                <td colspan="4" style="text-align:right;"><b>Total</b></td>
-                <td><b>{total_debit:,.0f}</b></td>
-                <td><b>{total_kredit:,.0f}</b></td>
-            </tr>
-            </tbody>
-        </table>
-
-        <p><i>Terbilang: {num2words(int(total_debit), lang='id')} rupiah</i></p>
-        <br><br>
-        <table style="width:100%; text-align:center; border:0;">
-            <tr>
-                <td>Direktur,</td>
-                <td>Finance,</td>
-            </tr>
-            <tr><td height="60px"></td><td></td></tr>
-            <tr>
-                <td>({settings.get('direktur','')})</td>
-                <td>({settings.get('finance','')})</td>
-            </tr>
-        </table>
+        <tr>
+            <td>{tanggal}</td>
+            <td>{akun}</td>
+            <td style='word-wrap:break-word'>{nama}</td>
+            <td style='word-wrap:break-word'>{desk}</td>
+            <td align='right'>{debit}</td>
+            <td align='right'>{kredit}</td>
+        </tr>
         """
 
-        # ✅ render HTML beneran, bukan teks mentah
-        st.markdown(html, unsafe_allow_html=True)
+    html += f"""
+        <tr>
+            <td colspan='4' align='right'><b>Total</b></td>
+            <td align='right'><b>{format_rupiah(total_debit)}</b></td>
+            <td align='right'><b>{format_rupiah(total_kredit)}</b></td>
+        </tr>
+    </table>
+    <p><i>Terbilang: {terbilang_rupiah(total_debit)}</i></p>
+    <br><br>
+    <table width='100%'>
+        <tr>
+            <td align='center'>Direktur,<br><br><br>({direktur})</td>
+            <td align='center'>Finance,<br><br><br>({finance})</td>
+        </tr>
+    </table>
+    """
+    return html
 
-        # =========================
-        # Tombol Cetak PDF
-        # =========================
-        if st.button("📥 Cetak Voucher Jurnal"):
-            pdf_file = buat_voucher(df, no_voucher, settings)
-            st.download_button("Download PDF", data=pdf_file,
-                               file_name=f"voucher_{no_voucher}.pdf")
+# ==============================
+# STREAMLIT APP
+# ==============================
+st.title("Mini Akunting - Voucher Jurnal")
+
+uploaded_file = st.file_uploader("Upload Jurnal (Excel)", type=["xlsx", "xls"])
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
+
+    # Input pengaturan custom
+    st.subheader("Pengaturan Perusahaan")
+    perusahaan = st.text_input("Nama Perusahaan", "Perusahaan ABC")
+    alamat = st.text_area("Alamat Perusahaan", "Jl. Contoh No.123 Jakarta")
+    direktur = st.text_input("Nama Direktur", "Direktur Utama")
+    finance = st.text_input("Nama Finance", "Manager Finance")
+    logo = st.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
+
+    voucher_no = st.selectbox("Pilih Nomor Voucher", df["Nomor Voucher Jurnal"].unique())
+
+    if st.button("Preview Voucher"):
+        df_voucher = df[df["Nomor Voucher Jurnal"] == voucher_no]
+        html_preview = preview_voucher(df_voucher, voucher_no, perusahaan, alamat, direktur, finance, logo.name if logo else None)
+        st.markdown(html_preview, unsafe_allow_html=True)
+
+    if st.button("Cetak Voucher Jurnal"):
+        df_voucher = df[df["Nomor Voucher Jurnal"] == voucher_no]
+        buffer = buat_voucher(df_voucher, voucher_no, perusahaan, alamat, direktur, finance, logo.name if logo else None)
+        b64 = base64.b64encode(buffer.read()).decode()
+        href = f'<a href="data:application/pdf;base64,{b64}" download="voucher.pdf">Download PDF</a>'
+        st.markdown(href, unsafe_allow_html=True)
