@@ -31,13 +31,14 @@ def buat_voucher(df, no_voucher, settings):
     pdf.add_page()
     pdf.set_font("Arial", "B", 12)
 
-    # === Header perusahaan: logo di atas nama perusahaan ===
+    # === Header perusahaan: logo di atas nama perusahaan, bisa diatur posisi ===
     if settings.get("logo"):
         page_width = pdf.w - pdf.l_margin - pdf.r_margin
         logo_width = settings.get("logo_size", 20)
         x_center = (pdf.w - logo_width) / 2
-        pdf.image(settings["logo"], x_center, 8, logo_width)
-        pdf.ln(logo_width + 2)
+        y_pos = settings.get("logo_y", 8)  # posisi vertikal
+        pdf.image(settings["logo"], x_center, y_pos, logo_width)
+        pdf.ln(logo_width - settings.get("jarak_logo", 5))  # jarak logo ke nama
 
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 6, settings.get("perusahaan",""), ln=1, align="C")
@@ -165,17 +166,17 @@ def buat_voucher(df, no_voucher, settings):
     pdf.output(buffer)
     return buffer
 
+
 # --- Streamlit ---
 st.set_page_config(page_title="Situs Pembuat Situs Jurnal", layout="wide")
 
-# Judul dan deskripsi
 st.title("🧾 Situs Pembuat Situs Jurnal")
 st.caption("by Reza Fahlevi Lubis")
 
 st.markdown("""
 Aplikasi ini digunakan untuk membuat **voucher jurnal akuntansi** secara otomatis dari file Excel.  
 Semua proses dijalankan **langsung di perangkat lokal Anda** — tidak ada data yang dikirim atau disimpan di server mana pun.  
-Anda dapat dengan aman mengunggah file jurnal, mengatur penandatangan, dan mengunduh hasilnya dalam bentuk **PDF atau ZIP**.
+Anda dapat mengunggah file jurnal, mengatur logo dan penandatangan, lalu mengunduh hasil dalam bentuk **PDF atau ZIP**.
 """)
 
 # Sidebar
@@ -183,7 +184,12 @@ st.sidebar.header("⚙️ Pengaturan Perusahaan")
 settings = {}
 settings["perusahaan"] = st.sidebar.text_input("Nama Perusahaan")
 settings["alamat"] = st.sidebar.text_area("Alamat Perusahaan")
-settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 50, 20)
+
+# Pengaturan logo fleksibel
+st.sidebar.subheader("🖼️ Pengaturan Logo")
+settings["logo_size"] = st.sidebar.slider("Ukuran Logo (mm)", 10, 60, 20)
+settings["logo_y"] = st.sidebar.slider("Posisi Vertikal Logo (mm dari atas)", 0, 40, 8)
+settings["jarak_logo"] = st.sidebar.slider("Jarak Logo ke Nama (mm)", 0, 15, 5)
 logo_file = st.sidebar.file_uploader("Upload Logo (PNG/JPG)", type=["png","jpg","jpeg"])
 if logo_file:
     tmp = BytesIO(logo_file.read())
