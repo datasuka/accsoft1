@@ -163,11 +163,11 @@ def buat_voucher(df, no_voucher, settings):
     return buffer
 
 # --- Streamlit ---
-st.set_page_config(page_title="Situs Pembuat Situs Jurnal", layout="wide")
+st.set_page_config(page_title="Situs Pembuat Jurnal Voucher", layout="wide")
 
 # Judul dan deskripsi
-st.title("🧾 Situs Pembuat Situs Jurnal")
-st.caption("by Reza Fahlevi Lubis")
+st.title("🧾 Situs Pembuat Jurnal Voucher")
+st.caption("by Reza Fahlevi Lubis @zavibis")
 
 st.markdown("""
 Aplikasi ini digunakan untuk membuat **voucher jurnal akuntansi** secara otomatis dari file Excel.  
