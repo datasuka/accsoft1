@@ -31,11 +31,14 @@ def buat_voucher(df, no_voucher, settings):
     pdf.add_page()
     pdf.set_font("Arial", "B", 12)
 
-    # Header perusahaan
+    # === Header perusahaan: logo di atas nama perusahaan ===
     if settings.get("logo"):
-        pdf.image(settings["logo"], 15, 8, settings.get("logo_size", 20))
+        page_width = pdf.w - pdf.l_margin - pdf.r_margin
+        logo_width = settings.get("logo_size", 20)
+        x_center = (pdf.w - logo_width) / 2
+        pdf.image(settings["logo"], x_center, 8, logo_width)
+        pdf.ln(logo_width + 2)
 
-    pdf.set_xy(0, 10)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 6, settings.get("perusahaan",""), ln=1, align="C")
 
@@ -43,7 +46,7 @@ def buat_voucher(df, no_voucher, settings):
     pdf.multi_cell(0, 5, settings.get("alamat",""), align="C")
     pdf.ln(3)
 
-    # Judul
+    # === Judul Dokumen ===
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, "BUKTI VOUCHER JURNAL", ln=1, align="C")
     pdf.set_font("Arial", "", 10)
@@ -163,11 +166,11 @@ def buat_voucher(df, no_voucher, settings):
     return buffer
 
 # --- Streamlit ---
-st.set_page_config(page_title="Situs Pembuat Jurnal Voucher", layout="wide")
+st.set_page_config(page_title="Situs Pembuat Situs Jurnal", layout="wide")
 
 # Judul dan deskripsi
-st.title("🧾 Situs Pembuat Jurnal Voucher")
-st.caption("by Reza Fahlevi Lubis @zavibis")
+st.title("🧾 Situs Pembuat Situs Jurnal")
+st.caption("by Reza Fahlevi Lubis")
 
 st.markdown("""
 Aplikasi ini digunakan untuk membuat **voucher jurnal akuntansi** secara otomatis dari file Excel.  
