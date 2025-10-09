@@ -163,8 +163,17 @@ def buat_voucher(df, no_voucher, settings):
     return buffer
 
 # --- Streamlit ---
-st.set_page_config(page_title="Mini Akunting", layout="wide")
-st.title("📑 Mini Akunting - Voucher Jurnal")
+st.set_page_config(page_title="Situs Pembuat Situs Jurnal", layout="wide")
+
+# Judul dan deskripsi
+st.title("🧾 Situs Pembuat Situs Jurnal")
+st.caption("by Reza Fahlevi Lubis")
+
+st.markdown("""
+Aplikasi ini digunakan untuk membuat **voucher jurnal akuntansi** secara otomatis dari file Excel.  
+Semua proses dijalankan **langsung di perangkat lokal Anda** — tidak ada data yang dikirim atau disimpan di server mana pun.  
+Anda dapat dengan aman mengunggah file jurnal, mengatur penandatangan, dan mengunduh hasilnya dalam bentuk **PDF atau ZIP**.
+""")
 
 # Sidebar
 st.sidebar.header("⚙️ Pengaturan Perusahaan")
